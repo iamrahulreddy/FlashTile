@@ -1,0 +1,60 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.11, pytest-9.0.2, pluggy-1.6.0 -- <cloud-env>/bin/python
+cachedir: .pytest_cache
+rootdir: <cloud-workspace>/FlashTile_Run
+configfile: pyproject.toml
+plugins: cov-7.0.0, anyio-4.12.1, timeout-2.4.0
+collecting ... collected 25 items
+
+tests/test_correctness.py::TestFlashV1Correctness::test_output_matches_naive[1-64-256-4] PASSED [  4%]
+tests/test_correctness.py::TestFlashV1Correctness::test_output_matches_naive[2-128-512-8] PASSED [  8%]
+tests/test_correctness.py::TestFlashV1Correctness::test_output_matches_naive[1-256-512-8] PASSED [ 12%]
+tests/test_correctness.py::TestFlashV1Correctness::test_output_matches_naive[4-64-256-4] PASSED [ 16%]
+tests/test_correctness.py::TestFlashV1Correctness::test_output_matches_naive[1-512-512-8] PASSED [ 20%]
+tests/test_correctness.py::TestFlashV1Correctness::test_different_block_sizes[32] PASSED [ 24%]
+tests/test_correctness.py::TestFlashV1Correctness::test_different_block_sizes[64] PASSED [ 28%]
+tests/test_correctness.py::TestFlashV1Correctness::test_different_block_sizes[128] PASSED [ 32%]
+tests/test_correctness.py::TestFlashV1Correctness::test_causal_masking PASSED [ 36%]
+tests/test_correctness.py::TestFlashV2Correctness::test_v2_matches_v1 PASSED [ 40%]
+tests/test_correctness.py::TestFlashV2Correctness::test_v2_causal_matches_naive PASSED [ 44%]
+tests/test_correctness.py::TestFlashV2Correctness::test_causal_property PASSED [ 48%]
+tests/test_correctness.py::TestGQACorrectness::test_gqa_with_full_heads_matches_mha PASSED [ 52%]
+tests/test_correctness.py::TestGQACorrectness::test_gqa_output_shape[1] PASSED [ 56%]
+tests/test_correctness.py::TestGQACorrectness::test_gqa_output_shape[2] PASSED [ 60%]
+tests/test_correctness.py::TestGQACorrectness::test_gqa_output_shape[4] PASSED [ 64%]
+tests/test_correctness.py::TestGQACorrectness::test_mqa_is_gqa_with_one_head PASSED [ 68%]
+tests/test_correctness.py::TestEdgeCases::test_sequence_not_divisible_by_block PASSED [ 72%]
+tests/test_correctness.py::TestEdgeCases::test_single_token_sequence PASSED [ 76%]
+tests/test_correctness.py::TestEdgeCases::test_very_small_values PASSED  [ 80%]
+tests/test_correctness.py::TestEdgeCases::test_large_values PASSED       [ 84%]
+tests/test_correctness.py::TestGradients::test_v1_backward_runs PASSED   [ 88%]
+tests/test_correctness.py::TestGradients::test_v2_backward_runs PASSED   [ 92%]
+tests/test_correctness.py::TestGradients::test_gradients_match_naive PASSED [ 96%]
+tests/test_correctness.py::TestMemoryUsage::test_flash_uses_less_memory PASSED [100%]
+
+=============================== warnings summary ===============================
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88: PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'
+    parse = parser.parseString(pattern)
+
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92: PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'
+    parser.resetCache()
+
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_mathtext.py:45
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_mathtext.py:45: PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'
+    ParserElement.enablePackrat()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 25 passed, 13 warnings in 4.25s ========================
+

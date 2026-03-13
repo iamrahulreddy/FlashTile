@@ -1,0 +1,42 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.11, pytest-9.0.2, pluggy-1.6.0 -- <cloud-env>/bin/python
+cachedir: .pytest_cache
+rootdir: <cloud-workspace>/FlashTile_Run
+configfile: pyproject.toml
+plugins: cov-7.0.0, anyio-4.12.1, timeout-2.4.0
+collecting ... collected 7 items
+
+tests/test_masked_attention.py::TestMaskedAttention::test_masked_attention_matches_naive PASSED [ 14%]
+tests/test_masked_attention.py::TestMaskedAttention::test_padding_mask PASSED [ 28%]
+tests/test_masked_attention.py::TestMaskedAttention::test_causal_mask PASSED [ 42%]
+tests/test_masked_attention.py::TestMaskedAttention::test_no_mask_matches_no_mask PASSED [ 57%]
+tests/test_masked_attention.py::TestMaskedAttention::test_backward_pass PASSED [ 71%]
+tests/test_masked_attention.py::TestMaskedAttention::test_memory_usage_report PASSED [ 85%]
+tests/test_masked_attention.py::TestMaskedAttention::test_chunked_processing PASSED [100%]
+
+=============================== warnings summary ===============================
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88: PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'
+    parse = parser.parseString(pattern)
+
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92: PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'
+    parser.resetCache()
+
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_mathtext.py:45
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_mathtext.py:45: PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'
+    ParserElement.enablePackrat()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 7 passed, 13 warnings in 2.53s ========================
+

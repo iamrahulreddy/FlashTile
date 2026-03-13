@@ -1,0 +1,17 @@
+Test Summary — Fri Feb 27 08:07:02 UTC 2026
+Passed: 12  Failed: 0  Skipped: 0
+
+  test_correctness: ======================= 25 passed, 13 warnings in 4.25s ========================
+  test_flash_v2: ======================== 4 passed, 13 warnings in 3.86s ========================
+  test_gqa: ======================= 18 passed, 13 warnings in 4.08s ========================
+  test_integration: ======================== 9 passed, 13 warnings in 7.08s ========================
+  test_masked_attention: ======================== 7 passed, 13 warnings in 3.92s ========================
+  test_sliding_window: ======================== 5 passed, 13 warnings in 3.87s ========================
+  test_precision: ======================= 16 passed, 13 warnings in 5.31s ========================
+  test_performance: ======================== 5 passed, 13 warnings in 8.24s ========================
+  test_factory: ======================= 19 passed, 13 warnings in 3.45s ========================
+  test_torch_compile: ================= 15 passed, 13 warnings in 180.99s (0:03:00) ==================
+  test_triton: ======================== 5 passed, 13 warnings in 5.50s ========================
+  test_stress: ================== 18 passed, 13 warnings in 93.29s (0:01:33) ==================
+
+Failures:

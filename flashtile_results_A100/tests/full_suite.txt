@@ -1,0 +1,181 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.11, pytest-9.0.2, pluggy-1.6.0 -- <cloud-env>/bin/python
+cachedir: .pytest_cache
+rootdir: <cloud-workspace>/FlashTile_Run
+configfile: pyproject.toml
+plugins: cov-7.0.0, anyio-4.12.1, timeout-2.4.0
+collecting ... collected 146 items
+
+tests/test_correctness.py::TestFlashV1Correctness::test_output_matches_naive[1-64-256-4] PASSED [  0%]
+tests/test_correctness.py::TestFlashV1Correctness::test_output_matches_naive[2-128-512-8] PASSED [  1%]
+tests/test_correctness.py::TestFlashV1Correctness::test_output_matches_naive[1-256-512-8] PASSED [  2%]
+tests/test_correctness.py::TestFlashV1Correctness::test_output_matches_naive[4-64-256-4] PASSED [  2%]
+tests/test_correctness.py::TestFlashV1Correctness::test_output_matches_naive[1-512-512-8] PASSED [  3%]
+tests/test_correctness.py::TestFlashV1Correctness::test_different_block_sizes[32] PASSED [  4%]
+tests/test_correctness.py::TestFlashV1Correctness::test_different_block_sizes[64] PASSED [  4%]
+tests/test_correctness.py::TestFlashV1Correctness::test_different_block_sizes[128] PASSED [  5%]
+tests/test_correctness.py::TestFlashV1Correctness::test_causal_masking PASSED [  6%]
+tests/test_correctness.py::TestFlashV2Correctness::test_v2_matches_v1 PASSED [  6%]
+tests/test_correctness.py::TestFlashV2Correctness::test_v2_causal_matches_naive PASSED [  7%]
+tests/test_correctness.py::TestFlashV2Correctness::test_causal_property PASSED [  8%]
+tests/test_correctness.py::TestGQACorrectness::test_gqa_with_full_heads_matches_mha PASSED [  8%]
+tests/test_correctness.py::TestGQACorrectness::test_gqa_output_shape[1] PASSED [  9%]
+tests/test_correctness.py::TestGQACorrectness::test_gqa_output_shape[2] PASSED [ 10%]
+tests/test_correctness.py::TestGQACorrectness::test_gqa_output_shape[4] PASSED [ 10%]
+tests/test_correctness.py::TestGQACorrectness::test_mqa_is_gqa_with_one_head PASSED [ 11%]
+tests/test_correctness.py::TestEdgeCases::test_sequence_not_divisible_by_block PASSED [ 12%]
+tests/test_correctness.py::TestEdgeCases::test_single_token_sequence PASSED [ 13%]
+tests/test_correctness.py::TestEdgeCases::test_very_small_values PASSED  [ 13%]
+tests/test_correctness.py::TestEdgeCases::test_large_values PASSED       [ 14%]
+tests/test_correctness.py::TestGradients::test_v1_backward_runs PASSED   [ 15%]
+tests/test_correctness.py::TestGradients::test_v2_backward_runs PASSED   [ 15%]
+tests/test_correctness.py::TestGradients::test_gradients_match_naive PASSED [ 16%]
+tests/test_correctness.py::TestMemoryUsage::test_flash_uses_less_memory PASSED [ 17%]
+tests/test_factory.py::TestFactoryFunction::test_factory_creates_correct_type[naive-NaiveAttention] PASSED [ 17%]
+tests/test_factory.py::TestFactoryFunction::test_factory_creates_correct_type[flash_v1-FlashAttentionV1] PASSED [ 18%]
+tests/test_factory.py::TestFactoryFunction::test_factory_creates_correct_type[flash_v2-FlashAttentionV2] PASSED [ 19%]
+tests/test_factory.py::TestFactoryFunction::test_factory_creates_correct_type[sliding_window-SlidingWindowAttention] PASSED [ 19%]
+tests/test_factory.py::TestFactoryFunction::test_factory_creates_correct_type[gqa-GroupedQueryAttention] PASSED [ 20%]
+tests/test_factory.py::TestFactoryFunction::test_factory_creates_correct_type[grouped_query-GroupedQueryAttention] PASSED [ 21%]
+tests/test_factory.py::TestFactoryFunction::test_factory_creates_correct_type[mqa-MultiQueryAttention] PASSED [ 21%]
+tests/test_factory.py::TestFactoryFunction::test_factory_creates_correct_type[multi_query-MultiQueryAttention] PASSED [ 22%]
+tests/test_factory.py::TestFactoryFunction::test_factory_creates_correct_type[masked-MaskedAttention] PASSED [ 23%]
+tests/test_factory.py::TestFactoryFunction::test_factory_case_insensitive[Naive] PASSED [ 23%]
+tests/test_factory.py::TestFactoryFunction::test_factory_case_insensitive[FLASH_V1] PASSED [ 24%]
+tests/test_factory.py::TestFactoryFunction::test_factory_case_insensitive[Flash-V2] PASSED [ 25%]
+tests/test_factory.py::TestFactoryFunction::test_factory_case_insensitive[GQA] PASSED [ 26%]
+tests/test_factory.py::TestFactoryFunction::test_factory_case_insensitive[gqa] PASSED [ 26%]
+tests/test_factory.py::TestFactoryFunction::test_factory_unknown_type_raises_error PASSED [ 27%]
+tests/test_factory.py::TestFactoryFunction::test_factory_forwards_kwargs PASSED [ 28%]
+tests/test_factory.py::TestFactoryFunction::test_factory_outputs_work_correctly PASSED [ 28%]
+tests/test_factory.py::TestFactoryFunction::test_factory_triton PASSED   [ 29%]
+tests/test_factory.py::TestFactoryFunction::test_factory_all_types_in_error_message PASSED [ 30%]
+tests/test_flash_v2.py::TestFlashV2Correctness::test_v2_matches_v1 PASSED [ 30%]
+tests/test_flash_v2.py::TestFlashV2Correctness::test_v2_matches_naive PASSED [ 31%]
+tests/test_flash_v2.py::TestCausalMasking::test_causal_output_is_causal PASSED [ 32%]
+tests/test_flash_v2.py::TestCausalMasking::test_causal_matches_naive_with_mask PASSED [ 32%]
+tests/test_gqa.py::TestGQABasic::test_output_shape[1] PASSED             [ 33%]
+tests/test_gqa.py::TestGQABasic::test_output_shape[2] PASSED             [ 34%]
+tests/test_gqa.py::TestGQABasic::test_output_shape[4] PASSED             [ 34%]
+tests/test_gqa.py::TestGQABasic::test_output_shape[8] PASSED             [ 35%]
+tests/test_gqa.py::TestGQABasic::test_no_nan_or_inf PASSED               [ 36%]
+tests/test_gqa.py::TestGQABasic::test_deterministic PASSED               [ 36%]
+tests/test_gqa.py::TestGQACorrectness::test_full_heads_matches_flash PASSED [ 37%]
+tests/test_gqa.py::TestGQACorrectness::test_causal_property PASSED       [ 38%]
+tests/test_gqa.py::TestMQA::test_mqa_output_shape PASSED                 [ 39%]
+tests/test_gqa.py::TestMQA::test_mqa_equals_gqa_one_head PASSED          [ 39%]
+tests/test_gqa.py::TestMQA::test_mqa_causal PASSED                       [ 40%]
+tests/test_gqa.py::TestGQAMemory::test_memory_savings_reported PASSED    [ 41%]
+tests/test_gqa.py::TestGQAMemory::test_actual_memory_reduction PASSED    [ 41%]
+tests/test_gqa.py::TestGQAGradients::test_backward_runs PASSED           [ 42%]
+tests/test_gqa.py::TestGQAGradients::test_mqa_backward_runs PASSED       [ 43%]
+tests/test_gqa.py::TestGQAEdgeCases::test_single_token PASSED            [ 43%]
+tests/test_gqa.py::TestGQAEdgeCases::test_non_divisible_sequence PASSED  [ 44%]
+tests/test_gqa.py::TestGQAEdgeCases::test_large_values PASSED            [ 45%]
+tests/test_integration.py::TestTrainingConvergence::test_flash_v1_converges PASSED [ 45%]
+tests/test_integration.py::TestTrainingConvergence::test_flash_v2_converges PASSED [ 46%]
+tests/test_integration.py::TestTrainingConvergence::test_gqa_converges PASSED [ 47%]
+tests/test_integration.py::TestTrainingConvergence::test_flash_matches_naive_training PASSED [ 47%]
+tests/test_integration.py::TestMultiLayerModels::test_two_layer_model_with_flash_v2 PASSED [ 48%]
+tests/test_integration.py::TestMultiLayerModels::test_mixed_attention_model PASSED [ 49%]
+tests/test_integration.py::TestEdgeCases::test_gradient_accumulation PASSED [ 50%]
+tests/test_integration.py::TestEdgeCases::test_mixed_precision_context PASSED [ 50%]
+tests/test_integration.py::TestEdgeCases::test_memory_efficiency_at_long_sequences PASSED [ 51%]
+tests/test_masked_attention.py::TestMaskedAttention::test_masked_attention_matches_naive PASSED [ 52%]
+tests/test_masked_attention.py::TestMaskedAttention::test_padding_mask PASSED [ 52%]
+tests/test_masked_attention.py::TestMaskedAttention::test_causal_mask PASSED [ 53%]
+tests/test_masked_attention.py::TestMaskedAttention::test_no_mask_matches_no_mask PASSED [ 54%]
+tests/test_masked_attention.py::TestMaskedAttention::test_backward_pass PASSED [ 54%]
+tests/test_masked_attention.py::TestMaskedAttention::test_memory_usage_report PASSED [ 55%]
+tests/test_masked_attention.py::TestMaskedAttention::test_chunked_processing PASSED [ 56%]
+tests/test_performance.py::TestPerformanceScaling::test_memory_scaling PASSED [ 56%]
+tests/test_performance.py::TestPerformanceScaling::test_flash_faster_at_long_sequences[512] PASSED [ 57%]
+tests/test_performance.py::TestPerformanceScaling::test_flash_faster_at_long_sequences[1024] PASSED [ 58%]
+tests/test_performance.py::TestPerformanceScaling::test_flash_faster_at_long_sequences[2048] PASSED [ 58%]
+tests/test_performance.py::TestTheoreticalMemory::test_memory_calculation_consistency PASSED [ 59%]
+tests/test_precision.py::TestFP16Precision::test_flash_v2_fp16_correctness PASSED [ 60%]
+tests/test_precision.py::TestFP16Precision::test_flash_v2_fp16_gradient_precision PASSED [ 60%]
+tests/test_precision.py::TestBF16Precision::test_flash_v2_bf16_correctness PASSED [ 61%]
+tests/test_precision.py::TestBF16Precision::test_bf16_fp32_accumulator PASSED [ 62%]
+tests/test_precision.py::TestBF16Precision::test_bf16_backward_pass PASSED [ 63%]
+tests/test_precision.py::TestMixedPrecision::test_autocast_fp16_forward PASSED [ 63%]
+tests/test_precision.py::TestMixedPrecision::test_autocast_bf16_forward PASSED [ 64%]
+tests/test_precision.py::TestMixedPrecision::test_gradient_scaler_compatibility PASSED [ 65%]
+tests/test_precision.py::TestNumericalStability::test_large_attention_scores PASSED [ 65%]
+tests/test_precision.py::TestNumericalStability::test_small_attention_scores PASSED [ 66%]
+tests/test_precision.py::TestNumericalStability::test_all_masked_positions PASSED [ 67%]
+tests/test_precision.py::TestNumericalStability::test_gradient_stability PASSED [ 67%]
+tests/test_precision.py::TestFP8Precision::test_fp8_tensor_creation PASSED [ 68%]
+tests/test_precision.py::TestFP8Precision::test_fp8_quantization_error PASSED [ 69%]
+tests/test_precision.py::TestPrecisionGQA::test_gqa_fp16_precision PASSED [ 69%]
+tests/test_precision.py::TestPrecisionGQA::test_mqa_fp16_precision PASSED [ 70%]
+tests/test_sliding_window.py::TestSlidingWindowCorrectness::test_sliding_window_matches_naive_with_window_mask PASSED [ 71%]
+tests/test_sliding_window.py::TestSlidingWindowCorrectness::test_causal_sliding_window_matches_naive PASSED [ 71%]
+tests/test_sliding_window.py::TestSlidingWindowCorrectness::test_window_boundary_conditions PASSED [ 72%]
+tests/test_sliding_window.py::TestSlidingWindowCorrectness::test_sliding_window_backward PASSED [ 73%]
+tests/test_sliding_window.py::TestSlidingWindowCorrectness::test_memory_usage_report PASSED [ 73%]
+tests/test_stress.py::TestLongSequences::test_sequence_2k PASSED         [ 74%]
+tests/test_stress.py::TestLongSequences::test_sequence_4k PASSED         [ 75%]
+tests/test_stress.py::TestLongSequences::test_sequence_8k PASSED         [ 76%]
+tests/test_stress.py::TestLongSequences::test_sequence_16k PASSED        [ 76%]
+tests/test_stress.py::TestLongSequences::test_sequence_32k PASSED        [ 77%]
+tests/test_stress.py::TestMemoryLeaks::test_no_memory_leak_forward PASSED [ 78%]
+tests/test_stress.py::TestMemoryLeaks::test_no_memory_leak_forward_backward PASSED [ 78%]
+tests/test_stress.py::TestMemoryLeaks::test_memory_cleanup_after_oom_recovery PASSED [ 79%]
+tests/test_stress.py::TestBatchSizes::test_large_batch_size PASSED       [ 80%]
+tests/test_stress.py::TestBatchSizes::test_varying_batch_sizes PASSED    [ 80%]
+tests/test_stress.py::TestEdgeCases::test_prime_sequence_lengths PASSED  [ 81%]
+tests/test_stress.py::TestEdgeCases::test_power_of_two_sequences PASSED  [ 82%]
+tests/test_stress.py::TestEdgeCases::test_one_less_than_block_size PASSED [ 82%]
+tests/test_stress.py::TestEdgeCases::test_one_more_than_block_size PASSED [ 83%]
+tests/test_stress.py::TestStabilityUnderLoad::test_sustained_inference PASSED [ 84%]
+tests/test_stress.py::TestStabilityUnderLoad::test_sustained_training PASSED [ 84%]
+tests/test_stress.py::TestSlidingWindowStress::test_sliding_window_long_sequence PASSED [ 85%]
+tests/test_stress.py::TestSlidingWindowStress::test_sliding_window_memory_efficiency PASSED [ 86%]
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compiles_inductor PASSED [ 86%]
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_eager_compiled_match PASSED [ 87%]
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compile_with_gradients PASSED [ 88%]
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compile_non_causal PASSED [ 89%]
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compile_different_backends PASSED [ 89%]
+tests/test_torch_compile.py::TestFlashAttentionV1Compile::test_flash_v1_compiles PASSED [ 90%]
+tests/test_torch_compile.py::TestFlashAttentionV1Compile::test_flash_v1_eager_compiled_match PASSED [ 91%]
+tests/test_torch_compile.py::TestGQACompile::test_gqa_compiles PASSED    [ 91%]
+tests/test_torch_compile.py::TestGQACompile::test_mqa_compiles PASSED    [ 92%]
+tests/test_torch_compile.py::TestSlidingWindowCompile::test_sliding_window_compiles PASSED [ 93%]
+tests/test_torch_compile.py::TestSlidingWindowCompile::test_sliding_window_eager_compiled_match PASSED [ 93%]
+tests/test_torch_compile.py::TestCompilePerformance::test_compile_speedup PASSED [ 94%]
+tests/test_torch_compile.py::TestCompileEdgeCases::test_compile_batch_size_1 PASSED [ 95%]
+tests/test_torch_compile.py::TestCompileEdgeCases::test_compile_sequence_length_1 PASSED [ 95%]
+tests/test_torch_compile.py::TestCompileEdgeCases::test_compile_different_dtypes PASSED [ 96%]
+tests/test_triton.py::TestTritonCorrectness::test_triton_matches_naive PASSED [ 97%]
+tests/test_triton.py::TestTritonCorrectness::test_triton_causal_matches_naive PASSED [ 97%]
+tests/test_triton.py::TestTritonCorrectness::test_triton_various_sequence_lengths PASSED [ 98%]
+tests/test_triton.py::TestTritonCorrectness::test_triton_output_shape PASSED [ 99%]
+tests/test_triton.py::TestTritonCorrectness::test_triton_memory_usage_report PASSED [100%]
+
+=============================== warnings summary ===============================
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88: PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'
+    parse = parser.parseString(pattern)
+
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92: PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'
+    parser.resetCache()
+
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_mathtext.py:45
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_mathtext.py:45: PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'
+    ParserElement.enablePackrat()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 146 passed, 13 warnings in 275.99s (0:04:35) =================
+

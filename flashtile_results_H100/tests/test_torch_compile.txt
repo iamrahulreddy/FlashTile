@@ -1,0 +1,54 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.11, pytest-9.0.2, pluggy-1.6.0 -- <cloud-env>/bin/python
+cachedir: .pytest_cache
+rootdir: <cloud-workspace>/FlashTile_Run
+configfile: pyproject.toml
+plugins: cov-7.0.0, anyio-4.12.1, timeout-2.4.0
+collecting ... collected 15 items
+
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compiles_inductor PASSED [  6%]
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_eager_compiled_match PASSED [ 13%]
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compile_with_gradients PASSED [ 20%]
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compile_non_causal PASSED [ 26%]
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compile_different_backends PASSED [ 33%]
+tests/test_torch_compile.py::TestFlashAttentionV1Compile::test_flash_v1_compiles PASSED [ 40%]
+tests/test_torch_compile.py::TestFlashAttentionV1Compile::test_flash_v1_eager_compiled_match PASSED [ 46%]
+tests/test_torch_compile.py::TestGQACompile::test_gqa_compiles PASSED    [ 53%]
+tests/test_torch_compile.py::TestGQACompile::test_mqa_compiles PASSED    [ 60%]
+tests/test_torch_compile.py::TestSlidingWindowCompile::test_sliding_window_compiles PASSED [ 66%]
+tests/test_torch_compile.py::TestSlidingWindowCompile::test_sliding_window_eager_compiled_match PASSED [ 73%]
+tests/test_torch_compile.py::TestCompilePerformance::test_compile_speedup PASSED [ 80%]
+tests/test_torch_compile.py::TestCompileEdgeCases::test_compile_batch_size_1 PASSED [ 86%]
+tests/test_torch_compile.py::TestCompileEdgeCases::test_compile_sequence_length_1 PASSED [ 93%]
+tests/test_torch_compile.py::TestCompileEdgeCases::test_compile_different_dtypes PASSED [100%]
+
+=============================== warnings summary ===============================
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compiles_inductor
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compiles_inductor
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compiles_inductor
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compiles_inductor
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compiles_inductor
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compiles_inductor
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88: PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'
+    parse = parser.parseString(pattern)
+
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compiles_inductor
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compiles_inductor
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compiles_inductor
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compiles_inductor
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compiles_inductor
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compiles_inductor
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92: PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'
+    parser.resetCache()
+
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compiles_inductor
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_mathtext.py:45: PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'
+    ParserElement.enablePackrat()
+
+tests/test_torch_compile.py::TestFlashAttentionV2Compile::test_flash_v2_compiles_inductor
+  <cloud-env>/lib/python3.12/site-packages/torch/_inductor/compile_fx.py:282: UserWarning: TensorFloat32 tensor cores for float32 matrix multiplication available but not enabled. Consider setting `torch.set_float32_matmul_precision('high')` for better performance.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 15 passed, 14 warnings in 258.74s (0:04:18) ==================
+

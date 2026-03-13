@@ -1,0 +1,108 @@
+{
+  "device": "cuda",
+  "gpu_name": "NVIDIA H100 80GB HBM3",
+  "gpu_memory_gb": 85.3,
+  "installation": {
+    "version": "0.2.1",
+    "torch_version": "2.8.0+cu128",
+    "cuda_available": true,
+    "cuda_version": "12.8",
+    "triton_available": true,
+    "triton_version": "3.4.0"
+  },
+  "forward_pass": {
+    "NaiveAttention": {
+      "status": "OK",
+      "shape": [
+        2,
+        512,
+        512
+      ],
+      "finite": true
+    },
+    "FlashAttentionV1": {
+      "status": "OK",
+      "shape": [
+        2,
+        512,
+        512
+      ],
+      "finite": true
+    },
+    "FlashAttentionV2": {
+      "status": "OK",
+      "shape": [
+        2,
+        512,
+        512
+      ],
+      "finite": true
+    },
+    "GQA": {
+      "status": "OK",
+      "shape": [
+        2,
+        512,
+        512
+      ],
+      "finite": true
+    },
+    "MQA": {
+      "status": "OK",
+      "shape": [
+        2,
+        512,
+        512
+      ],
+      "finite": true
+    },
+    "SlidingWindow": {
+      "status": "OK",
+      "shape": [
+        2,
+        512,
+        512
+      ],
+      "finite": true
+    }
+  },
+  "correctness": {
+    "max_diff": 1.7881393432617188e-07,
+    "mean_diff": 1.1052748050133232e-08,
+    "passed": true
+  },
+  "backward": {
+    "grad_finite": true,
+    "grad_shape": [
+      1,
+      128,
+      256
+    ]
+  },
+  "memory_estimates": {
+    "NaiveAttention": {
+      "mb": 2281.701376,
+      "complexity": "O(N\u00b2)"
+    },
+    "FlashAttentionV1": {
+      "mb": 135.790592,
+      "complexity": "O(N)"
+    },
+    "FlashAttentionV2": {
+      "mb": 135.790592,
+      "complexity": "O(N)"
+    },
+    "GQA": {
+      "mb": 83.88608,
+      "complexity": "O(N) forward / O(N\u00b2) backward"
+    },
+    "MQA": {
+      "mb": 75.497472,
+      "complexity": "O(N) forward / O(N\u00b2) backward"
+    },
+    "SlidingWindow": {
+      "mb": 135.790592,
+      "complexity": "O(N \u00d7 256)"
+    }
+  }
+}

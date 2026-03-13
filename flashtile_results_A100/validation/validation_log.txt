@@ -1,0 +1,23 @@
+  NaiveAttention            OK   shape=[2, 512, 512]
+  FlashAttentionV1          OK   shape=[2, 512, 512]
+  FlashAttentionV2          OK   shape=[2, 512, 512]
+  GQA                       OK   shape=[2, 512, 512]
+  MQA                       OK   shape=[2, 512, 512]
+  SlidingWindow             OK   shape=[2, 512, 512]
+
+Correctness (Flash V2 vs Naive, shared weights):
+  max_diff=0.00000015  PASS
+
+Backward pass:
+  PASS  grad_shape=[1, 128, 256]
+
+Memory estimates (batch=4, seq=4096):
+  NaiveAttention            2281.701376 MB   O(N²)
+  FlashAttentionV1          135.790592 MB   O(N)
+  FlashAttentionV2          135.790592 MB   O(N)
+  GQA                       83.88608 MB   O(N) forward / O(N²) backward
+  MQA                       75.497472 MB   O(N) forward / O(N²) backward
+  SlidingWindow             135.790592 MB   O(N × 256)
+
+Saved to <cloud-workspace>/flashtile_results_20260227_075620/validation/validation_results.json
+

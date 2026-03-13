@@ -1,0 +1,53 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.11, pytest-9.0.2, pluggy-1.6.0 -- <cloud-env>/bin/python
+cachedir: .pytest_cache
+rootdir: <cloud-workspace>/FlashTile_Run
+configfile: pyproject.toml
+plugins: cov-7.0.0, anyio-4.12.1, timeout-2.4.0
+collecting ... collected 18 items
+
+tests/test_gqa.py::TestGQABasic::test_output_shape[1] PASSED             [  5%]
+tests/test_gqa.py::TestGQABasic::test_output_shape[2] PASSED             [ 11%]
+tests/test_gqa.py::TestGQABasic::test_output_shape[4] PASSED             [ 16%]
+tests/test_gqa.py::TestGQABasic::test_output_shape[8] PASSED             [ 22%]
+tests/test_gqa.py::TestGQABasic::test_no_nan_or_inf PASSED               [ 27%]
+tests/test_gqa.py::TestGQABasic::test_deterministic PASSED               [ 33%]
+tests/test_gqa.py::TestGQACorrectness::test_full_heads_matches_flash PASSED [ 38%]
+tests/test_gqa.py::TestGQACorrectness::test_causal_property PASSED       [ 44%]
+tests/test_gqa.py::TestMQA::test_mqa_output_shape PASSED                 [ 50%]
+tests/test_gqa.py::TestMQA::test_mqa_equals_gqa_one_head PASSED          [ 55%]
+tests/test_gqa.py::TestMQA::test_mqa_causal PASSED                       [ 61%]
+tests/test_gqa.py::TestGQAMemory::test_memory_savings_reported PASSED    [ 66%]
+tests/test_gqa.py::TestGQAMemory::test_actual_memory_reduction PASSED    [ 72%]
+tests/test_gqa.py::TestGQAGradients::test_backward_runs PASSED           [ 77%]
+tests/test_gqa.py::TestGQAGradients::test_mqa_backward_runs PASSED       [ 83%]
+tests/test_gqa.py::TestGQAEdgeCases::test_single_token PASSED            [ 88%]
+tests/test_gqa.py::TestGQAEdgeCases::test_non_divisible_sequence PASSED  [ 94%]
+tests/test_gqa.py::TestGQAEdgeCases::test_large_values PASSED            [100%]
+
+=============================== warnings summary ===============================
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88: PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'
+    parse = parser.parseString(pattern)
+
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92: PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'
+    parser.resetCache()
+
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_mathtext.py:45
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_mathtext.py:45: PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'
+    ParserElement.enablePackrat()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 18 passed, 13 warnings in 4.08s ========================
+

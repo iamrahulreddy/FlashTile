@@ -1,0 +1,44 @@
+﻿name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install pytest numpy
+          pip install -e .
+
+      - name: Verify installation
+        run: |
+          python -c "from flashtile import NaiveAttention, FlashAttentionV1; print('Import OK')"
+
+      - name: Run tests
+        run: |
+          # GPU-dependent tests (test_triton, test_stress, test_performance, test_precision, test_torch_compile)
+          # are excluded from CI — they require A100/H100 hardware and are validated manually.
+          # See flashtile_results_A100/ and flashtile_results_H100/ for full GPU test evidence.
+          pytest tests/test_correctness.py tests/test_factory.py tests/test_flash_v2.py tests/test_gqa.py tests/test_masked_attention.py tests/test_sliding_window.py -v --tb=short
+
