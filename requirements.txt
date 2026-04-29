@@ -1,0 +1,6 @@
+﻿# Core Dependencies
+torch>=2.0.0
+numpy>=1.24.0
+
+# Optional: GPU Kernel Development
+# triton>=2.1.0  # Required only for TritonFlashAttention

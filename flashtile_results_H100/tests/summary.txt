@@ -1,0 +1,20 @@
+Test Summary — Fri Feb 27 08:37:21 UTC 2026
+Passed: 11  Failed: 1  Skipped: 0
+
+  test_correctness: ======================= 25 passed, 13 warnings in 3.07s ========================
+  test_flash_v2: ======================== 4 passed, 13 warnings in 2.54s ========================
+  test_gqa: ======================= 18 passed, 13 warnings in 2.67s ========================
+  test_integration: ======================== 9 passed, 13 warnings in 4.71s ========================
+  test_masked_attention: ======================== 7 passed, 13 warnings in 2.53s ========================
+  test_sliding_window: ======================== 5 passed, 13 warnings in 2.54s ========================
+  test_precision: ======================= 16 passed, 13 warnings in 3.49s ========================
+  test_performance: ======================== 5 passed, 13 warnings in 4.77s ========================
+  test_factory: ======================= 19 passed, 13 warnings in 2.24s ========================
+  test_torch_compile: ================= 15 passed, 14 warnings in 258.74s (0:04:18) ==================
+  test_triton: ======================== 5 passed, 13 warnings in 4.19s ========================
+  test_stress: ================== 1 failed, 17 passed, 13 warnings in 46.43s ==================
+
+Failures:
+  --- test_stress ---
+tests/test_stress.py::TestMemoryLeaks::test_memory_cleanup_after_oom_recovery FAILED [ 44%]
+FAILED tests/test_stress.py::TestMemoryLeaks::test_memory_cleanup_after_oom_recovery - assert 67.6352 < (0.526336 * 50)

@@ -1,0 +1,54 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.11, pytest-9.0.2, pluggy-1.6.0 -- <cloud-env>/bin/python
+cachedir: .pytest_cache
+rootdir: <cloud-workspace>/FlashTile_Run
+configfile: pyproject.toml
+plugins: cov-7.0.0, anyio-4.12.1, timeout-2.4.0
+collecting ... collected 19 items
+
+tests/test_factory.py::TestFactoryFunction::test_factory_creates_correct_type[naive-NaiveAttention] PASSED [  5%]
+tests/test_factory.py::TestFactoryFunction::test_factory_creates_correct_type[flash_v1-FlashAttentionV1] PASSED [ 10%]
+tests/test_factory.py::TestFactoryFunction::test_factory_creates_correct_type[flash_v2-FlashAttentionV2] PASSED [ 15%]
+tests/test_factory.py::TestFactoryFunction::test_factory_creates_correct_type[sliding_window-SlidingWindowAttention] PASSED [ 21%]
+tests/test_factory.py::TestFactoryFunction::test_factory_creates_correct_type[gqa-GroupedQueryAttention] PASSED [ 26%]
+tests/test_factory.py::TestFactoryFunction::test_factory_creates_correct_type[grouped_query-GroupedQueryAttention] PASSED [ 31%]
+tests/test_factory.py::TestFactoryFunction::test_factory_creates_correct_type[mqa-MultiQueryAttention] PASSED [ 36%]
+tests/test_factory.py::TestFactoryFunction::test_factory_creates_correct_type[multi_query-MultiQueryAttention] PASSED [ 42%]
+tests/test_factory.py::TestFactoryFunction::test_factory_creates_correct_type[masked-MaskedAttention] PASSED [ 47%]
+tests/test_factory.py::TestFactoryFunction::test_factory_case_insensitive[Naive] PASSED [ 52%]
+tests/test_factory.py::TestFactoryFunction::test_factory_case_insensitive[FLASH_V1] PASSED [ 57%]
+tests/test_factory.py::TestFactoryFunction::test_factory_case_insensitive[Flash-V2] PASSED [ 63%]
+tests/test_factory.py::TestFactoryFunction::test_factory_case_insensitive[GQA] PASSED [ 68%]
+tests/test_factory.py::TestFactoryFunction::test_factory_case_insensitive[gqa] PASSED [ 73%]
+tests/test_factory.py::TestFactoryFunction::test_factory_unknown_type_raises_error PASSED [ 78%]
+tests/test_factory.py::TestFactoryFunction::test_factory_forwards_kwargs PASSED [ 84%]
+tests/test_factory.py::TestFactoryFunction::test_factory_outputs_work_correctly PASSED [ 89%]
+tests/test_factory.py::TestFactoryFunction::test_factory_triton PASSED   [ 94%]
+tests/test_factory.py::TestFactoryFunction::test_factory_all_types_in_error_message PASSED [100%]
+
+=============================== warnings summary ===============================
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88: PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'
+    parse = parser.parseString(pattern)
+
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92: PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'
+    parser.resetCache()
+
+../../../../<cloud-env>/lib/python3.12/site-packages/matplotlib/_mathtext.py:45
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_mathtext.py:45: PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'
+    ParserElement.enablePackrat()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 19 passed, 13 warnings in 3.45s ========================
+

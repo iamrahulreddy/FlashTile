@@ -1,0 +1,94 @@
+======================================================================
+FlashTile Benchmark Suite
+======================================================================
+Device: cuda
+Embed dim: 768, Heads: 12, Batch: 4
+Sequence lengths: [256, 512, 1024, 2048, 4096]
+Causal: False
+Runs per config: 5 (warmup: 2)
+======================================================================
+
+📊 Benchmarking Naive Attention (O(N²))...
+  Testing seq_len=256... OK (mem=89.2MB, time=0.72ms)
+  Testing seq_len=512... OK (mem=281.3MB, time=1.65ms)
+  Testing seq_len=1024... OK (mem=1025.4MB, time=4.39ms)
+  Testing seq_len=2048... OK (mem=3953.6MB, time=13.66ms)
+  Testing seq_len=4096... OK (mem=15570.1MB, time=43.56ms)
+
+📊 Benchmarking Flash Attention V1...
+  Testing seq_len=256... OK (mem=36.8MB, time=9.20ms)
+  Testing seq_len=512... OK (mem=54.1MB, time=35.10ms)
+  Testing seq_len=1024... OK (mem=90.1MB, time=139.95ms)
+  Testing seq_len=2048... OK (mem=162.1MB, time=550.42ms)
+  Testing seq_len=4096... OK (mem=306.1MB, time=2220.35ms)
+
+📊 Benchmarking Flash Attention V2...
+  Testing seq_len=256... OK (mem=36.8MB, time=8.37ms)
+  Testing seq_len=512... OK (mem=54.1MB, time=30.97ms)
+  Testing seq_len=1024... OK (mem=90.1MB, time=122.16ms)
+  Testing seq_len=2048... OK (mem=162.1MB, time=478.93ms)
+  Testing seq_len=4096... OK (mem=306.1MB, time=1889.02ms)
+
+📊 Benchmarking Grouped Query Attention (GQA)...
+  Testing seq_len=256... OK (mem=34.1MB, time=8.08ms)
+  Testing seq_len=512... OK (mem=52.1MB, time=29.77ms)
+  Testing seq_len=1024... OK (mem=87.4MB, time=115.71ms)
+  Testing seq_len=2048... OK (mem=159.4MB, time=453.46ms)
+  Testing seq_len=4096... OK (mem=303.4MB, time=1814.85ms)
+
+📊 Benchmarking Triton Kernel...
+  Testing seq_len=256... OK (mem=41.1MB, time=0.58ms)
+  Testing seq_len=512... OK (mem=65.1MB, time=0.99ms)
+  Testing seq_len=1024... OK (mem=113.1MB, time=1.94ms)
+  Testing seq_len=2048... OK (mem=209.1MB, time=4.41ms)
+  Testing seq_len=4096... OK (mem=401.1MB, time=11.14ms)
+
+======================================================================
+Benchmark Summary
+======================================================================
+
+Naive:
+  Memory: [89.1953125, 281.25390625, 1025.37109375, 3953.60546875, 15570.07421875]
+  Time: [0.7210869998743874, 1.6529830001672963, 4.390871999930823, 13.655694399858476, 43.56034060019738]
+
+Flash V1:
+  Memory: [36.7802734375, 54.13671875, 90.13671875, 162.13671875, 306.13671875]
+  Time: [9.195317399826308, 35.09610620003514, 139.94951539989415, 550.423848200262, 2220.3481075997843]
+
+Flash V2:
+  Memory: [36.8037109375, 54.13671875, 90.13671875, 162.13671875, 306.13671875]
+  Time: [8.367805200214207, 30.967067599885922, 122.16204020005534, 478.9251272000911, 1889.0183839999736]
+
+GQA:
+  Memory: [34.1328125, 52.1328125, 87.3828125, 159.3828125, 303.3828125]
+  Time: [8.08197940023092, 29.765833799683605, 115.70634440013237, 453.45875839993823, 1814.845919199979]
+
+Triton:
+  Memory: [41.13671875, 65.13671875, 113.13671875, 209.13671875, 401.13671875]
+  Time: [0.5771225998614682, 0.985335000041232, 1.9429443998888019, 4.41454360006901, 11.143052600164083]
+
+Speedups vs Naive:
+  Flash V1: [0.0784189352602454, 0.04709875764410701, 0.0313746852740738, 0.024809416315279442, 0.019618698730662774]
+  Flash V2: [0.08617397066747304, 0.053378738391535195, 0.03594301464464928, 0.02851321349475413, 0.023059775896917892]
+  GQA: [0.08922158349646181, 0.05553289759297341, 0.03794841175473002, 0.030114523420042814, 0.024002225279488]
+  Triton: [1.2494520229280162, 1.6775847809101738, 2.259906150779261, 3.093342287896988, 3.909192764607065]
+
+Memory Reductions vs Naive:
+  Flash V1: [2.4250856278044766, 5.195252182697164, 11.375731310942578, 24.384392993952826, 50.85987163619196]
+  Flash V2: [2.423541274179425, 5.195252182697164, 11.375731310942578, 24.384392993952826, 50.85987163619196]
+  GQA: [2.6131837949187458, 5.394949797692193, 11.734242288779615, 24.805720307828047, 51.32154353256251]
+  Triton: [2.168265122020701, 4.317901049475262, 9.063115008804337, 18.904406133846354, 38.814881537817335]
+
+✓ Results saved to: <cloud-workspace>/flashtile_results_20260227_075620/benchmarks/non_causal/benchmark_results.json
+
+📈 Generating visualizations...
+  Creating memory scaling plot...
+Saved plot to: <cloud-workspace>/flashtile_results_20260227_075620/benchmarks/non_causal/benchmark_memory.png
+  Creating performance plot...
+Saved plot to: <cloud-workspace>/flashtile_results_20260227_075620/benchmarks/non_causal/benchmark_performance.png
+  Creating dashboard...
+Saved dashboard to: <cloud-workspace>/flashtile_results_20260227_075620/benchmarks/non_causal/benchmark_dashboard.png
+  ✓ Plots saved to: <cloud-workspace>/flashtile_results_20260227_075620/benchmarks/non_causal
+
+✅ Benchmark complete!
+

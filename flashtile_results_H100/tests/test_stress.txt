@@ -1,0 +1,60 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.11, pytest-9.0.2, pluggy-1.6.0 -- <cloud-env>/bin/python
+cachedir: .pytest_cache
+rootdir: <cloud-workspace>/FlashTile_Run
+configfile: pyproject.toml
+plugins: cov-7.0.0, anyio-4.12.1, timeout-2.4.0
+collecting ... collected 18 items
+
+tests/test_stress.py::TestLongSequences::test_sequence_2k PASSED         [  5%]
+tests/test_stress.py::TestLongSequences::test_sequence_4k PASSED         [ 11%]
+tests/test_stress.py::TestLongSequences::test_sequence_8k PASSED         [ 16%]
+tests/test_stress.py::TestLongSequences::test_sequence_16k PASSED        [ 22%]
+tests/test_stress.py::TestLongSequences::test_sequence_32k PASSED        [ 27%]
+tests/test_stress.py::TestMemoryLeaks::test_no_memory_leak_forward PASSED [ 33%]
+tests/test_stress.py::TestMemoryLeaks::test_no_memory_leak_forward_backward PASSED [ 38%]
+tests/test_stress.py::TestMemoryLeaks::test_memory_cleanup_after_oom_recovery FAILED [ 44%]
+tests/test_stress.py::TestBatchSizes::test_large_batch_size PASSED       [ 50%]
+tests/test_stress.py::TestBatchSizes::test_varying_batch_sizes PASSED    [ 55%]
+tests/test_stress.py::TestEdgeCases::test_prime_sequence_lengths PASSED  [ 61%]
+tests/test_stress.py::TestEdgeCases::test_power_of_two_sequences PASSED  [ 66%]
+tests/test_stress.py::TestEdgeCases::test_one_less_than_block_size PASSED [ 72%]
+tests/test_stress.py::TestEdgeCases::test_one_more_than_block_size PASSED [ 77%]
+tests/test_stress.py::TestStabilityUnderLoad::test_sustained_inference PASSED [ 83%]
+tests/test_stress.py::TestStabilityUnderLoad::test_sustained_training PASSED [ 88%]
+tests/test_stress.py::TestSlidingWindowStress::test_sliding_window_long_sequence PASSED [ 94%]
+tests/test_stress.py::TestSlidingWindowStress::test_sliding_window_memory_efficiency PASSED [100%]
+
+=================================== FAILURES ===================================
+____________ TestMemoryLeaks.test_memory_cleanup_after_oom_recovery ____________
+tests/test_stress.py:226: in test_memory_cleanup_after_oom_recovery
+    assert final_memory < model_params_memory * 50
+E   assert 67.6352 < (0.526336 * 50)
+=============================== warnings summary ===============================
+tests/test_stress.py::TestLongSequences::test_sequence_2k
+tests/test_stress.py::TestLongSequences::test_sequence_2k
+tests/test_stress.py::TestLongSequences::test_sequence_2k
+tests/test_stress.py::TestLongSequences::test_sequence_2k
+tests/test_stress.py::TestLongSequences::test_sequence_2k
+tests/test_stress.py::TestLongSequences::test_sequence_2k
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:88: PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'
+    parse = parser.parseString(pattern)
+
+tests/test_stress.py::TestLongSequences::test_sequence_2k
+tests/test_stress.py::TestLongSequences::test_sequence_2k
+tests/test_stress.py::TestLongSequences::test_sequence_2k
+tests/test_stress.py::TestLongSequences::test_sequence_2k
+tests/test_stress.py::TestLongSequences::test_sequence_2k
+tests/test_stress.py::TestLongSequences::test_sequence_2k
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py:92: PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'
+    parser.resetCache()
+
+tests/test_stress.py::TestLongSequences::test_sequence_2k
+  <cloud-env>/lib/python3.12/site-packages/matplotlib/_mathtext.py:45: PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'
+    ParserElement.enablePackrat()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_stress.py::TestMemoryLeaks::test_memory_cleanup_after_oom_recovery - assert 67.6352 < (0.526336 * 50)
+================== 1 failed, 17 passed, 13 warnings in 46.43s ==================
+
