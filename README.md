@@ -1,321 +1,380 @@
 # FlashTile
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.9+](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://python.org)
-[![PyTorch 2.0+](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
+[![PyTorch 2.4+](https://img.shields.io/badge/PyTorch-2.4+-ee4c2c.svg)](https://pytorch.org)
 [![CI](https://github.com/iamrahulreddy/FlashTile/actions/workflows/ci.yml/badge.svg)](https://github.com/iamrahulreddy/FlashTile/actions)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iamrahulreddy/FlashTile/blob/main/demo/FlashTile_Demo.ipynb)
 
-**FlashTile** is a reference implementation of **Flash Attention** (V1 and V2) focused on clarity. It includes readable PyTorch implementations of IO-aware tiling, online softmax, GQA/MQA variants, and a Triton kernel, with $O(N)$ memory behavior for the V1/V2 forward and backward passes.
+**FlashTile** is exact attention (FlashAttention-2 style) written three times: a dense fp64 reference,
+a readable tiled PyTorch version, and fused Triton kernels for forward and backward. All three follow
+the same rules and every test checks them against each other. v2 also runs inside real models
+through Hugging Face transformers: Qwen3.5-4B in 8-bit and Qwen3.8-27B in bf16.
+
+It's tested and benchmarked on three GPUs:
+- NVIDIA H200 (Hopper)
+- NVIDIA B200 (datacenter Blackwell)
+- RTX PRO 6000 (workstation Blackwell)
+
+![FlashTile across GPUs](docs/cross_gpu_dashboard.png)
 
 ### Overview
-- **Flash-V1/V2**: Custom autograd implementations with memory-efficient recomputation in the backward pass.
-- **GQA/MQA**: Reference implementations for grouped-query and multi-query attention.
-- **Triton kernel**: Forward-only fused kernel benchmarked at **11.8×** naive speed at 8K in the committed A100 run.
-- **Validation**: Full benchmarks and the 146-test suite were validated on **NVIDIA A100-80GB**. An archived **H100-80GB** cross-check run (145/146 before a since-fixed stress-test threshold) is documented below.
-- **Compatibility**: Works with `torch.compile`, mixed precision (`fp16`/`bf16`), and a masked fallback for arbitrary attention patterns.
+- **Triton kernels, forward and backward**: GQA/MQA without copying K/V, causal with position
+  offsets (prefill, decode, chunked prefill), any head dim up to 256, gradients through the
+  returned LSE. About 430 lines of kernel code.
+- **Checked against an fp64 oracle**: 158/158 tests pass on each of the three GPUs. Every benchmark
+  row is checked for correctness before it's timed (990 rows, zero parity failures).
+- **Faster than PyTorch's FlashAttention-2 path** in the forward pass at long context on all three
+  GPUs (1.04-1.67x at 16K, d=128).
+- **Half the training memory** of PyTorch's FA2 path, and a third with GQA.
+- **Real models**: drop-in attention for Qwen3.5-4B via `attn_implementation`, measured for
+  precision, long-context prefill, generation and fine-tuning. Qwen3.8-27B on H200 against
+  PyTorch's FA2 and cuDNN on the same five prompts.
 
-The Python modules are written to be easy to inspect. They are useful for understanding the algorithm and validating memory behavior, while the Triton kernel is the performance-oriented path in this repo.
+## What changed since v1
+
+v1 (0.2.2) was mostly about understanding the algorithm. It had readable PyTorch modules
+(`FlashAttentionV1`, `FlashAttentionV2`, GQA/MQA, sliding window) and a forward-only Triton kernel,
+tested on A100 and H100. v2 is a rewrite aimed at making the fast path real and proving it's
+correct.
+
+| | v1 (0.2.2) | v2 (2.0.0) |
+|---|---|---|
+| Triton kernel | forward only | forward + backward |
+| GQA/MQA backward | standard autograd, O(N²) memory | in-kernel, O(N), no K/V copies |
+| API | `nn.Module` classes with projections, input `(batch, seq, embed)` | `attention(q, k, v)` on `[B, H, L, d]` tensors |
+| Causal | square only | position offsets: prefill, decode, chunked prefill |
+| Head dims (Triton) | powers of two only | any d <= 256 (24, 72, 80 are tested) |
+| Correctness | V1/V2 vs naive | three implementations vs an fp64 oracle, incl. all gradients and LSE |
+| Benchmarked against | naive attention | naive + PyTorch FA2, cuDNN and mem-efficient backends |
+| GPUs | A100 (H100 cross-check) | H200, B200, RTX PRO 6000 |
+| Real model | none | Qwen3.5-4B FP8 and Qwen3.8-27B bf16 through transformers |
+
+On the same kind of comparison v1 made: the v2 Triton forward is about **42x** faster than naive
+attention at 8K on H200 (v1: 11.8x on A100, with different shapes, so take it loosely). A training step at 8K uses **56.5 MB** of attention
+memory against naive's 8.1 GB.
+
+Dropped in v2:
+- the separate sliding-window and masked modules (arbitrary masks still work, on the tiled path)
+- the `torch.compile` test
+- the Colab/gradio demo
+
+The v1 code and its A100/H100 results are the 0.2.2 release and stay in the git history.
 
 ## Performance Results
 
-Benchmarked on **NVIDIA A100-SXM4-80GB** (CUDA 12.8, PyTorch 2.8.0) with `batch_size=4, embed_dim=768, num_heads=12`:
+bf16, batch x length = 16,384 tokens, L = 16K. TFLOP/s, higher is better:
 
-### Memory Scaling (Causal Attention)
+| Workload | H200: FlashTile / FA2 / cuDNN | B200 | RTX PRO 6000 |
+|---|---|---|---|
+| causal forward, d=128 | 446 / 319 / 568 | 570 / 341 / 1202 | 347 / 315 / 330 |
+| causal fwd+bwd, d=128 | 334 / 311 / 535 | 472 / 326 / 1146 | 231 / 311 / 288 |
+| GQA forward (32q / 8kv) | 454 / 337 / 584 | 581 / 367 / 1261 | 350 / 326 / 342 |
+| Qwen3.5 shape forward (16q / 4kv, d=256) | 461 / 309 / 630 | 435 / 376 / 1496 | 207 / 322 / n/a* |
+| Qwen3.5 shape fwd+bwd | 226 / 268 / 411 | 289 / 307 / 1004 | 141 / 236 / n/a* |
 
-| Sequence Length | Naive Memory | Flash V2 Memory | Reduction | Triton Kernel Speed vs Naive |
-|-----------------|-------------|-----------------|-----------|------------------------------|
-| 512 | 282 MB | 54 MB | **5.2×** | 1.9× faster |
-| 1,024 | 1,026 MB | 90 MB | **11.4×** | 2.8× faster |
-| 2,048 | 3,958 MB | 162 MB | **24.4×** | 3.9× faster |
-| 4,096 | 15,586 MB | 306 MB | **50.9×** | **6.4× faster** |
-| 8,192 | 61,907 MB | 594 MB | **104.2×** | **11.8× faster** |
+> \* PyTorch's cuDNN backend refuses head dim 256 on RTX PRO 6000 ("head_dim should be no more than 128").
 
-At 8K tokens in the committed A100 run, naive attention peaked at **61.9 GB** while Flash V2 used **594 MB**. In the same configuration, the Triton kernel ran **11.8×** faster than naive attention.
-> *Note on the 104× figure: The memory reduction scales with sequence length due to O(N²) vs O(N) complexity. At 2K tokens it is ~24×, scaling linearly up to ~104× at 8K in the committed A100 benchmark run.*
+Training-step attention memory, mha-d128:
 
-The Python **V1/V2** implementations provide true **O(N)** memory for both forward and backward via custom autograd. **GQA/MQA** keep **O(N)** forward memory but rely on standard autograd for backward, which is **O(N²)** during training. Because the Python implementations iterate over blocks in Python, they are slower than naive attention's fused cuBLAS calls. For speed, use the included **Triton kernel** (forward-only) or PyTorch's built-in `F.scaled_dot_product_attention()`.
+| | FlashTile | PyTorch FA2 | cuDNN |
+|---|---|---|---|
+| MHA | 258 MB | 514 MB | 387 MB (515 on RTX) |
+| GQA | 324 MB | 1092 MB | 836 MB (1092 on RTX) |
 
-The memory gap becomes significant at longer sequence lengths. By 4K+ tokens, naive attention often becomes the limiting factor while the tiled implementations remain tractable.
+What stands out:
+- **On B200** the same Triton source is 1.26-1.67x faster than PyTorch's FA2 path. Triton compiles
+  it for B200's newer tensor cores, while the prebuilt FA2 kernel doesn't use them.
+- **On RTX PRO 6000** FlashTile has the fastest forward of all backends for long causal and GQA
+  attention, cuDNN included.
+- **Compared with the first v2 run** (Nov 15, older kernels), H200 got 17-55% faster at 16K. cuDNN
+  stayed flat over the same runs, so that's the kernel changes plus the Triton upgrade.
 
-```bash
-# Reproduce these results
-python benchmark/benchmark.py --max-seq-len 8192 --batch-size 4 --embed-dim 768 --num-heads 12
-```
+Every configuration, all lengths: [docs/PERFORMANCE.md](docs/PERFORMANCE.md). Raw logs, dashboards
+and JSON are in `flashtile_results_<GPU>/`.
 
-## The Algorithm
+### About all those result files
 
-Flash Attention gets O(N) memory from two ideas:
+There are close to 200 files across the three `flashtile_results_<GPU>/` folders. Nobody needs to
+read them all. They're receipts: boring until someone asks where a number came from. If you only
+open a few:
 
-### 1. Block-wise Tiling
+- **Tests**, what passed:
+  [H200](flashtile_results_H200/tests/summary.txt) ·
+  [B200](flashtile_results_B200/tests/summary.txt) ·
+  [RTX PRO 6000](flashtile_results_RTX-PRO-6000/tests/summary.txt)
+- **Benchmarks**, every table and dashboard:
+  [H200](flashtile_results_H200/benchmarks/REPORT.md) ·
+  [B200](flashtile_results_B200/benchmarks/REPORT.md) ·
+  [RTX PRO 6000](flashtile_results_RTX-PRO-6000/benchmarks/REPORT.md)
+- **Qwen3.5-4B answers**, SDPA vs FlashTile:
+  [H200](flashtile_results_H200/llm/generations.md) ·
+  [B200](flashtile_results_B200/llm/generations.md) ·
+  [RTX PRO 6000](flashtile_results_RTX-PRO-6000/llm/generations.md)
+- **Qwen3.8-27B answers**, all four attention paths:
+  [H200](flashtile_results_H200/qwen3.8-27b/generations.md)
 
-Instead of computing the full NxN attention matrix, we process in small BxB blocks:
+## Where it falls short
 
-```
-Standard: Materialize full NxN        Flash: Process BxB blocks
-┌─────────────────────────┐          ┌──┬──┬──┬──┐
-│                         │          │▓▓│  │  │  │ → Process
-│   16 MILLION elements   │    →     ├──┼──┼──┼──┤    block by
-│   (4096 × 4096)         │          │  │▓▓│  │  │    block
-│                         │          ├──┼──┼──┼──┤
-└─────────────────────────┘          │  │  │▓▓│  │ → Never store
-     O(N²) memory                    └──┴──┴──┴──┘    full matrix!
-                                         O(N) memory
-```
+> [!IMPORTANT]
+> FlashTile isn't the fastest attention on datacenter GPUs. PyTorch's cuDNN backend beats it on
+> H200 and B200, so for production serving or training use PyTorch's SDPA (or flash-attn).
+> FlashTile is the readable, fully checked option.
 
-### 2. Online Softmax
+These are measured too, they're in the same result folders:
 
-Softmax needs the full row to compute the denominator.
+- **cuDNN is much faster on datacenter GPUs.**
+  - B200: 1.6-3.5x faster than FlashTile depending on the shape, 2.1-2.5x for d=128 at 16K
+    (roughly 66% of peak vs 26%).
+  - H200: FlashTile's forward reaches 73-88% of cuDNN at long context, its training step 55-69%.
 
-Flash Attention handles this by updating running statistics block by block:
+  Closing that gap needs Hopper/Blackwell-specific data movement (TMA, warp specialization, tensor
+  memory), not more tuning.
+- **Head dim 256 is the weakest case**, and that's Qwen3.5's own shape. Inside the model at 65K
+  tokens, attention takes 1.38x cuDNN's time on H200, 3.65x on B200 and 1.81x FA2's on RTX PRO 6000.
+  The whole model ends up 6% / 24% / 16% slower. In Qwen3.8-27B on H200 it's 1.7x cuDNN's attention
+  time at 22-34K tokens.
+- **The backward lags the forward.** At 16K it's 0.55-0.69x cuDNN on H200 and 0.60-0.85x FA2 on
+  RTX PRO 6000.
+- **Long-context decoding barely uses the GPU.** At batch 1 only `batch x kv_heads` programs run (4
+  for Qwen3.5). There's no split-KV decode kernel yet. On RTX PRO 6000, decoding over a 39K-token
+  context ran at 11.7 tok/s vs SDPA's 19.7. In Qwen3.8-27B on H200, attention per decoded token took
+  9.4 ms at 22K and 12.6 ms at 34K, against 2.2-2.4 ms for FA2 and cuDNN. Tokens per second came out
+  the same there only because HF's own per-token overhead is bigger.
+- **The single-pass backward with atomic dQ didn't pay off.** It's faster only on a few shapes (d=64
+  on B200, d=256 at long L on RTX), so the two-kernel backward stays the default.
+- **Missing features:**
+  - padding masks run on the slow tiled PyTorch path
+  - no variable-length packing, paged KV cache, sliding window, dropout or FP8 attention
+- **The first call per shape is slow.** It's JIT compiled and autotuned; the full test suite takes
+  12-26 minutes per GPU, mostly because of that.
+- **One unexplained dip.** d=64 at L=4096 is slower than at its neighbors, on both H200 and B200,
+  with the same autotune pick both times. Haven't tracked it down yet.
+- **Training equivalence is from one seed.** The loss curves track SDPA's (max gap 4.4e-3 on H200,
+  2.7e-3 on RTX), but B200 had a few steps with gaps up to 1.7e-2, and it's a single seed so far.
 
-```python
-# Initialize running statistics
-m = -inf  # running max (for numerical stability)
-l = 0     # running sum of exp(scores - max)
-O = 0     # running weighted output
-
-# For each new block of scores S:
-m_new = max(m, S.max())                           # Update max
-l_new = l * exp(m - m_new) + sum(exp(S - m_new))  # Rescale and accumulate
-O = O * (l * exp(m - m_new)) / l_new + ...        # Rescale output
-m, l = m_new, l_new                               # Update state
-```
-
-This produces the same output as standard attention while keeping memory O(N).
+> [!WARNING]
+> Batched generation with padding falls off the fast path. Every attention call with a padding mask
+> runs on the tiled PyTorch path: exact, but much slower. Batch-1 generation and unpadded batches
+> stay on Triton.
 
 ## Installation
 
 ```bash
-# Clone the repository
 git clone https://github.com/iamrahulreddy/FlashTile.git
 cd FlashTile
-
-# Install with pip (recommended)
-pip install -e .
-
-# With all optional dependencies
-pip install -e ".[all]"  # Includes Triton, benchmarks, demo, dev tools
+pip install -e .            # add ".[hf]" for the transformers integration
 ```
 
-**Requirements**: Python 3.9+, PyTorch 2.0+, CUDA-capable GPU (recommended)
+The Triton path needs an NVIDIA GPU. Everything else (oracle, tiled path, tests) runs on CPU.
+Tested with torch 2.15 and Triton 3.9.
 
 ## Quick Start
 
 ```python
 import torch
-from flashtile import FlashAttentionV2, get_attention
+from flashtile import attention, select_backend
 
-# Create Flash Attention V2 with causal masking (for decoder models)
-model = FlashAttentionV2(embed_dim=512, num_heads=8, causal=True)
+q = torch.randn(2, 32, 4096, 128, device="cuda", dtype=torch.bfloat16)   # [B, Hq, L, d]
+k = torch.randn(2, 8, 4096, 128, device="cuda", dtype=torch.bfloat16)    # [B, Hkv, L, d], GQA
+v = torch.randn(2, 8, 4096, 128, device="cuda", dtype=torch.bfloat16)
 
-# Input: (batch, seq_len, embed_dim)
-x = torch.randn(2, 4096, 512).cuda()
-model = model.cuda()
+out = attention(q, k, v, causal=True)                   # triton on CUDA, tiled elsewhere
+out, lse = attention(q, k, v, causal=True, return_lse=True)
+print(select_backend(q, k, v, causal=True))             # ('triton', 'supported')
 
-# Forward pass - works with sequences that would OOM with naive attention
-output, _ = model(x)
-print(f"Output shape: {output.shape}")  # torch.Size([2, 4096, 512])
-
-# Or use the factory function
-model = get_attention("flash_v2", embed_dim=512, num_heads=8, causal=True)
+# decode: one new query at position 4096 over 4097 cached keys (CPU positions, no GPU sync)
+q1 = torch.randn(2, 32, 1, 128, device="cuda", dtype=torch.bfloat16)
+kv = torch.randn(2, 8, 4097, 128, device="cuda", dtype=torch.bfloat16)
+o1 = attention(q1, kv, kv, causal=True, q_pos=torch.arange(4096, 4097), k_pos=torch.arange(4097))
 ```
 
-## Demo
-
-A small Gradio app is included for comparing memory usage across implementations:
-
-```bash
-# Run the interactive showcase
-python demo/app.py
-```
-
-## Implementations
-
-| Implementation | Memory | Key Feature | Use Case |
-|----------------|--------|-------------|----------|
-| **NaiveAttention** | O(N²) | Returns attention weights | Correctness reference, visualization |
-| **FlashAttentionV1** | O(N) | Online softmax, memory-efficient backward | Algorithm study, reference baseline |
-| **FlashAttentionV2** | O(N) | Swapped loops + causal skip (~50% faster) | Decoder models (GPT-style) |
-| **SlidingWindowAttention** | O(N×W) | Local attention window (Mistral-style) | Long context with local patterns |
-| **GroupedQueryAttention** | O(N) forward | Shared KV heads (LLaMA 2 style) | Inference optimization |
-| **MultiQueryAttention** | O(N) forward | Single KV head | Maximum KV cache savings |
-| **TritonFlashAttention** | O(N) | Low-level fused GPU kernel | Max performance (Inference/Forward-only) |
-
-### Flash Attention V2: Causal Optimization
-
-```python
-from flashtile import FlashAttentionV2
-
-# V2 with causal masking skips ~50% of block computations
-model = FlashAttentionV2(embed_dim=512, num_heads=8, causal=True)
-
-# Check efficiency stats
-efficiency = model.get_causal_efficiency(seq_len=1024)
-print(f"Compute savings: {efficiency['compute_savings_percent']:.1f}%")
-# Output: Compute savings: 46.9%
-```
-
-### Grouped-Query Attention (GQA)
-
-```python
-from flashtile import GroupedQueryAttention, MultiQueryAttention
-
-# GQA: 8 query heads share 2 KV heads (4x KV cache savings)
-gqa = GroupedQueryAttention(
-    embed_dim=512, num_heads=8, num_kv_heads=2, causal=True
-)
-
-# MQA: All heads share 1 KV head (8x KV cache savings)
-mqa = MultiQueryAttention(embed_dim=512, num_heads=8, causal=True)
-
-# Memory comparison
-mem = gqa.get_memory_usage(batch_size=2, seq_len=4096)
-print(f"KV cache savings: {mem['kv_savings_ratio']:.1f}x vs MHA")
-```
-
-### Using torch.compile (PyTorch 2.0+)
+With Hugging Face transformers (5.x), as the attention of a whole model:
 
 ```python
 import torch
-from flashtile import FlashAttentionV2
+import flashtile.hf
+from transformers import AutoModelForCausalLM
 
-model = FlashAttentionV2(embed_dim=512, num_heads=8, causal=True).cuda()
-model = torch.compile(model)  # Enables kernel fusion
-
-x = torch.randn(2, 2048, 512).cuda()
-out, _ = model(x)  # Compiled execution
+flashtile.hf.register()
+model = AutoModelForCausalLM.from_pretrained(
+    "Qwen/Qwen2.5-1.5B-Instruct", dtype=torch.bfloat16, device_map="cuda",
+    attn_implementation=flashtile.hf.NAME,
+)
+# generate / train as usual; flashtile.hf.stats shows which path each attention call took
 ```
+
+The registered name is `"ftile"`, not `"flashtile"`. transformers treats any name containing "flash"
+as a FlashAttention kernel and tries to download one.
+
+More in **[docs/USAGE.md](docs/USAGE.md)**:
+- the full API
+- generation, fine-tuning, Qwen3.5 and Qwen3.8 with transformers
+- decode, chunked prefill, masks and the LSE
+- what happens with padding, sliding windows and dropout
+- troubleshooting
+
+## Qwen3.5-4B
+
+Qwen3.5-4B mixes 24 Gated-DeltaNet layers with 8 softmax-attention layers (16 query heads, 4 KV
+heads, head dim 256). FlashTile replaces those 8 and nothing else.
+
+Inference uses
+[`RedHatAI/Qwen3.5-4B-FP8-dynamic`](https://huggingface.co/RedHatAI/Qwen3.5-4B-FP8-dynamic),
+training uses the bf16 original. Per GPU, `flashtile_results_<GPU>/llm/` has:
+
+- **Precision on real activations and real training gradients**, per layer, vs an fp64 oracle.
+  FlashTile's error is equal to or lower than SDPA's in 110 of 120 comparisons; for dV it's never
+  higher and often 2-4x lower.
+- **Prefill up to 65K tokens** against HF eager and SDPA. Eager runs out of memory at 32K and needs
+  41 GB at 16K, where FlashTile needs 2 GB.
+- **Greedy generation** (`generations.md`). On H200 a 141-token code answer came out identical to
+  SDPA's, and a question about a 39K-token document was answered correctly on all three GPUs. The
+  other outputs drift apart after 5-52 tokens. FP8 activation quantization amplifies tiny
+  differences, and HF eager drifts from SDPA just as much.
+- **Fine-tuning** the 8 attention blocks for 30 steps, from the same weights, with SDPA and with
+  FlashTile.
+
+>Something I found while profiling: transformers runs this FP8 checkpoint as quantize-dequantize
+>with bf16 matmuls. So 8-bit saves memory (6.1 vs 9.0 GB) but not time. That's why attention time is
+>reported separately from whole-model time.
+
+![Qwen3.5-4B on H200](flashtile_results_H200/llm/llm_dashboard.png)
+
+## Qwen3.8-27B
+
+A bigger check of the same idea: [`Qwen/Qwen3.8-27B`](https://huggingface.co/Qwen/Qwen3.8-27B) in
+bf16 on one H200. It has 64 layers, 16 of them softmax attention (24 query heads, 4 KV heads, head
+dim 256). The same five prompts went through four attention paths, greedy, thinking off:
+
+- **SDPA**, PyTorch's own pick. The profiler shows it's cuDNN on H200, and its outputs were
+  bit-identical to forced cuDNN.
+- **FA2**, SDPA forced to its built-in FlashAttention-2 kernel. The `flash-attn` package has no
+  wheels for torch 2.15 / CUDA 13, so `attn_implementation="flash_attention_2"` wasn't an option.
+- **cuDNN**, SDPA forced to cuDNN.
+- **FlashTile**.
+
+Prefill, time spent inside the 16 attention layers:
+
+| Prompt | Tokens | cuDNN (= SDPA) | FA2 | FlashTile |
+|---|---:|---:|---:|---:|
+| docs question (README, USAGE, PERFORMANCE, ...) | 22,263 | 162 ms | 380 ms | 282 ms |
+| code question (`flashtile/`, `benchmark/`) | 33,846 | 371 ms | 819 ms | 627 ms |
+| three short prompts | 30-62 | 2.5-3.4 ms | 2.5-3.7 ms | 3.7-4.1 ms |
+
+- **At long context FlashTile is 1.3x faster than FA2 and 1.7x slower than cuDNN.** Whole-model
+  prefill differs by under 10% (2.4-2.6 s and 3.8-4.2 s), since the other 48 layers and
+  the MLPs do most of the work.
+- **Short prompts are a loss.** A few ms of attention is mostly fixed per-call cost.
+- **Decode is the weak spot.** At 22-34K context FlashTile spends 9.4-12.6 ms per token in attention
+  vs about 2.2-2.4 ms for FA2 and cuDNN, the split-KV gap from the list above. All four paths still
+  decode at 11.4-14.3 tok/s, because HF's own per-token overhead is bigger.
+- **Outputs.** The math answer (256 tokens) is identical on all four paths. On the short and the
+  code prompt FlashTile's answer is token-for-token FA2's, and both split from cuDNN's at token 67
+  and 79. On the long prompts every path drifts at some point. On the docs question FlashTile
+  splits from the others at token 30, but its answer is just as correct. Its prefill logits are as
+  close to SDPA's as FA2's are, or closer (KL 5.7e-4 vs 1.0e-3 at 34K), with the same top-1 token
+  at 98-100% of the checked positions.
+- **cuDNN wasn't repeatable at 22K+.** The same prompt twice gave different answers, and even SDPA
+  and forced cuDNN (same kernel) split at token 80 and 35. FA2 and FlashTile were repeatable.
+
+Logs, JSON, all answers and the dashboard are in
+[`flashtile_results_H200/qwen3.8-27b/`](flashtile_results_H200/qwen3.8-27b/). `causal_conv1d`
+wasn't installed, so the Gated-DeltaNet layers used transformers' slower fallback on every path.
+That inflates whole-model times, not the attention ones.
+
+![Qwen3.8-27B on H200](flashtile_results_H200/qwen3.8-27b/compare_dashboard.png)
+
+## Reproduce
+
+CPU tests:
+
+```bash
+pip install -e ".[dev]"
+pytest -v
+```
+
+GPU tests, validation, the kernel benchmark and the Qwen3.5 run use [Modal](https://modal.com):
+
+```bash
+pip install modal
+modal run modal_app.py --gpus H200                    # everything on one GPU, ~65 min
+modal run modal_app.py --gpus H200,B200,RTX-PRO-6000  # all three in parallel
+modal run modal_app.py --gpus H200 --skip-llm --pytest-args "tests/test_triton.py"
+modal run modal_app.py --qwen27b                      # Qwen3.8-27B comparison, H200 (else H100/B200)
+```
+
+New runs land in `results/<timestamp>/flashtile_results_<GPU>/` (the 27B one in
+`results/<timestamp>/qwen3.8-27b_<GPU>/`). The Qwen3.5 run reads its text from a
+local `corpus/` folder that isn't in the repo. Put a few long English `.md` files there (names are in
+`modal_app.py`), or pass `--skip-llm`. The 27B run needs no corpus, its long prompts are this repo's
+own docs and source. Its first run downloads about 55 GB of weights into a Modal volume. An optional
+Modal secret named `huggingface` with `HF_TOKEN` speeds up downloads.
 
 ## Project Structure
 
 ```
-FlashTile/
-├── flashtile/                     # Core package
-│   ├── attention/                 # Attention implementations
-│   │   ├── base_attention.py      # Abstract base class
-│   │   ├── naive_attention.py     # O(N²) baseline
-│   │   ├── flash_attention_v1.py  # O(N) Flash Attention V1
-│   │   ├── flash_attention_v2.py  # O(N) Flash Attention V2
-│   │   ├── sliding_window_attention.py  # O(N×W) Sliding Window
-│   │   ├── masked_attention.py    # Custom mask fallback
-│   │   ├── amp_compat.py          # AMP compatibility utilities
-│   │   └── grouped_query_attention.py  # GQA and MQA
-│   ├── kernels/                   # GPU kernels
-│   │   ├── triton_flash_kernel.py # Custom Triton kernel
-│   │   └── kernel_benchmarks.py   # Performance benchmarking
-│   └── utils/                     # Profiling utilities
-│       ├── memory_profiler.py     # Memory/time measurement
-│       ├── attention_visualizer.py # Attention pattern visualization
-│       ├── visualization.py       # Chart generation utilities
-│       └── kernel_profiler.py     # CUDA kernel profiling
-├── benchmark/                     # Performance benchmarking
-├── demo/                          # Interactive Demos
-├── docs/                          # Documentation
-│   ├── ARCHITECTURE.md            # Technical design
-│   ├── ALGORITHM.md               # Algorithm deep-dive
-│   ├── USAGE.md                   # API reference
-│   └── PERFORMANCE.md             # Benchmarking methodology
-└── tests/                         # Comprehensive test suite (146 tests on A100)
+flashtile/
+├── contract.py         # input checks, shapes, mask polarity
+├── reference.py        # dense fp64 oracle
+├── tiled.py            # tiled PyTorch forward/backward
+├── triton_kernels.py   # fused Triton forward/backward
+├── api.py              # attention(), backend selection
+├── hf.py               # transformers integration
+└── __init__.py
+
+tests/                  # test_attention (CPU), test_cuda, test_triton, test_hf (GPU)
+benchmark/              # kernel benchmark, validation, Qwen3.5 eval, Qwen3.8-27B comparison, plots
+docs/                   # USAGE.md, PERFORMANCE.md, cross-GPU dashboard
+flashtile_results_*/    # results per GPU (tests, validation, benchmarks, llm; qwen3.8-27b on H200)
+modal_app.py            # runs everything on Modal
 ```
 
-## Documentation
+## Coming soon
 
-- **[Architecture](docs/ARCHITECTURE.md)** — Technical design and data flow
-- **[Algorithm](docs/ALGORITHM.md)** — Mathematical derivation of online softmax
-- **[Usage Guide](docs/USAGE.md)** — Detailed API reference
-- **[Performance](docs/PERFORMANCE.md)** — Benchmarking methodology and A100 results
+Plans, not promises. Roughly in this order:
+
+- **Split-KV decode.** The biggest gap measured so far. Spread a long KV cache over many programs
+  and merge the pieces with the LSE the kernels already return.
+- **Custom kernels for small open-weight models.** Kernels shaped for the exact layouts of small
+  open-weight models, starting with the Qwen3.5 family: head dim 256, a fixed GQA ratio, the output
+  gate fused into the attention epilogue, and the Gated-DeltaNet layers next to it. The target is a
+  single GPU, workstation cards included, since that's where FlashTile already holds its own.
+- **Hopper and Blackwell data movement** (TMA, warp specialization), to go after the cuDNN gap.
+- **Padding and variable-length batches on the Triton path**, so batched generation stays fast.
+- **Paged KV cache and sliding window**, the two things a serving stack asks for first.
+- **FP8 attention** on the GPUs that have it.
+- **Loose ends**: more seeds for the training comparison, and the d=64 dip at L=4096.
+
+If one of these matters to you, open an issue. It helps decide what comes first.
 
 ## Comparison with Other Libraries
 
-| Library | Implementation | Memory Efficient? | Backward Pass | Purpose |
-|---------|---------------|-------------------|---------------|---------|
-| [flash-attn](https://github.com/Dao-AILab/flash-attention) | Optimized CUDA | ✅ Yes | ✅ Optimized | Production inference |
-| [xFormers](https://github.com/facebookresearch/xformers) | Optimized CUDA | ✅ Yes | ✅ Optimized | Meta's efficient ops |
-| PyTorch `F.scaled_dot_product_attention` | Fused kernel | ✅ Yes | ✅ Optimized | Built-in (PyTorch 2.0+) |
-| **FlashTile** (This repo) | Python + Triton | ✅ Yes (V1/V2) | ✅ Recomputation (V1/V2) | **Educational** |
+| Library | Implementation | Backward | Notes |
+|---------|---------------|----------|-------|
+| [flash-attn](https://github.com/Dao-AILab/flash-attention) | CUDA | yes | the reference for speed |
+| PyTorch `F.scaled_dot_product_attention` | FA2 / cuDNN / mem-efficient | yes | built in, picks a backend for you |
+| [FlexAttention](https://pytorch.org/blog/flexattention/) | Triton, generated | yes | custom masks and score mods |
+| **FlashTile** | Triton + PyTorch | yes | small, readable, checked against an fp64 oracle |
 
-> For production workloads, prefer PyTorch's built-in `F.scaled_dot_product_attention()` or Dao-AI's `flash-attn`.
-> FlashTile is meant to be a readable reference implementation with a small Triton path for comparison.
-
-**Implementation Notes**:
-- **V1/V2**: True O(N) memory for forward AND backward (custom autograd)
-- **GQA/MQA**: O(N) forward, but O(N²) backward (standard autograd—good for inference)
-- **Triton**: Forward-only, fastest implementation (11.8× vs naive at 8K seq)
-
-## Key Features
-
-### Memory-Efficient Backward Pass
-
-Unlike simple implementations, FlashTile includes gradient checkpointing in the backward pass:
-
-```python
-# Forward: O(N) memory - never stores attention matrix
-# Backward: Recomputes attention block-by-block
-# Result: True O(N) memory for both forward AND backward
-
-model = FlashAttentionV2(embed_dim=512, num_heads=8)
-x = torch.randn(2, 2048, 512, requires_grad=True).cuda()
-model = model.cuda()
-
-out, _ = model(x)
-loss = out.mean()
-loss.backward()  # Memory-efficient backward pass
-```
-
-### Triton Kernel with Causal Masking
-
-```python
-from flashtile import TritonFlashAttention
-
-# Custom Triton module with causal support
-kernel = TritonFlashAttention(embed_dim=512, num_heads=8, causal=True).cuda().half().eval()
-
-x = torch.randn(2, 2048, 512).cuda().half()
-
-with torch.no_grad():
-    out, _ = kernel(x)  # Fused GPU execution (forward-only)
-```
-
-### Validation
-
-```
-A100: 146/146 passed | Archived H100 run: 145/146 passed
-  ✓ 25 correctness tests (V1/V2/GQA vs naive reference)
-  ✓ 16 precision tests (fp32/fp16/bf16, GradScaler, numerical stability)
-  ✓ 18 stress tests (up to 32K sequence length, memory leak detection)
-  ✓ 15 torch.compile tests (inductor, eager, gradient compatibility)
-  ✓ 5 Triton kernel tests
-  ✓ Max numerical error: 1.5e-07 (machine epsilon)
-  ✗ 1 H100 stress test: CUDA allocator retains workspace memory (not a code bug)
-```
-
-> *H100 artifacts are from a pre-fix run — see [flashtile_results_H100/NOTE.md](flashtile_results_H100/NOTE.md) for details.*
-> *CI covers the CPU-compatible unit subset. GPU-heavy suites (performance, stress, Triton, torch.compile) are archived separately under `flashtile_results_A100/` and `flashtile_results_H100/`.*
-> *The archived A100/H100 validation JSON and logs were generated on the Feb 27, 2026 validation run. This cleanup updates public-facing docs/tests/artifacts without claiming a fresh rerun.*
+For production, use PyTorch's SDPA or flash-attn. FlashTile is a readable implementation that turned
+out to be competitive in a lot of places, and the numbers above show where it isn't.
 
 ## References
 
-1. **FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness**
-   Tri Dao, Daniel Y. Fu, Stefano Ermon, Atri Rudra, Christopher Re
-   *NeurIPS 2022* — [arXiv:2205.14135](https://arxiv.org/abs/2205.14135)
-
-2. **FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning**
-   Tri Dao
-   *ICLR 2024* — [arXiv:2307.08691](https://arxiv.org/abs/2307.08691)
-
-3. **GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints**
-   Joshua Ainslie et al.
-   *EMNLP 2023* — [arXiv:2305.13245](https://arxiv.org/abs/2305.13245)
-
-4. **Triton: An Intermediate Language and Compiler for Tiled Neural Network Computations**
-   Philippe Tillet, H.T. Kung, David Cox
-   *MAPL 2019* — [Triton Documentation](https://triton-lang.org/)
+1. **FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness**,
+   Tri Dao, Daniel Y. Fu, Stefano Ermon, Atri Rudra, Christopher Ré. NeurIPS 2022.
+   [arXiv:2205.14135](https://arxiv.org/abs/2205.14135)
+2. **FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning**,
+   Tri Dao. ICLR 2024. [arXiv:2307.08691](https://arxiv.org/abs/2307.08691)
+3. **GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints**,
+   Joshua Ainslie et al. EMNLP 2023. [arXiv:2305.13245](https://arxiv.org/abs/2305.13245)
+4. **Triton: An Intermediate Language and Compiler for Tiled Neural Network Computations**,
+   Philippe Tillet, H.T. Kung, David Cox. MAPL 2019. [triton-lang.org](https://triton-lang.org/)
 
 ## Author
 
-**Muskula Rahul** — [@iamrahulreddy](https://github.com/iamrahulreddy)
+**Muskula Rahul** ([@iamrahulreddy](https://github.com/iamrahulreddy))
 
 ## License
 
-This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
+MIT, see [LICENSE](LICENSE).

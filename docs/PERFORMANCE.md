@@ -1,340 +1,217 @@
-# FlashTile Performance Guide
-
-Benchmarking methodology, optimization tips, and validated results from A100 GPU testing.
-
-## Quick Benchmark
-
-```python
-import torch
-import time
-from flashtile import NaiveAttention, FlashAttentionV1, FlashAttentionV2
-
-
-def benchmark(model, x, warmup=3, runs=10):
-    model.eval()
-    with torch.no_grad():
-        for _ in range(warmup):
-            _ = model(x)
-
-        if x.is_cuda:
-            torch.cuda.synchronize()
-
-        start = time.perf_counter()
-        for _ in range(runs):
-            _ = model(x)
-        if x.is_cuda:
-            torch.cuda.synchronize()
-
-    return (time.perf_counter() - start) / runs * 1000  # ms
-
-
-# Configuration
-batch_size = 2
-seq_len = 1024
-embed_dim = 512
-num_heads = 8
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
-x = torch.randn(batch_size, seq_len, embed_dim).to(device)
-
-naive = NaiveAttention(embed_dim, num_heads).to(device)
-flash_v1 = FlashAttentionV1(embed_dim, num_heads).to(device)
-flash_v2 = FlashAttentionV2(embed_dim, num_heads, causal=True).to(device)
-
-print(f"Naive:     {benchmark(naive, x):.2f} ms")
-print(f"Flash V1:  {benchmark(flash_v1, x):.2f} ms")
-print(f"Flash V2:  {benchmark(flash_v2, x):.2f} ms")
-```
-
-## A100 Benchmark Results
-
-Validated on **NVIDIA A100-SXM4-80GB** (CUDA 12.8, PyTorch 2.8.0, Triton 3.4.0).
-
-### Memory Scaling (Causal, batch=4, embed_dim=768, num_heads=12)
-
-| Sequence Length | Naive Memory | Flash V1 Memory | Flash V2 Memory | GQA Memory | Triton Memory |
-|-----------------|-------------|-----------------|-----------------|------------|---------------|
-| 256 | 89.3 MB | 36.8 MB | 36.8 MB | 34.1 MB | 41.1 MB |
-| 512 | 281.5 MB | 54.1 MB | 54.1 MB | 52.1 MB | 65.1 MB |
-| 1,024 | 1026.4 MB | 90.1 MB | 90.1 MB | 87.4 MB | 113.1 MB |
-| 2,048 | 3957.6 MB | 162.1 MB | 162.1 MB | 159.4 MB | 209.1 MB |
-| 4,096 | 15586.1 MB | 306.1 MB | 306.1 MB | 303.4 MB | 401.1 MB |
-| 8,192 | 61907.0 MB | 594.1 MB | 594.1 MB | 591.4 MB | 785.1 MB |
-
-**Memory reduction at 8K vs Naive**:
-- Flash V1: **104.2x**
-- Flash V2: **104.2x**
-- GQA: **104.7x**
-- Triton: **78.8x**
-
-### Execution Time (Causal, ms)
-
-| Sequence Length | Naive | Flash V1 | Flash V2 | GQA | Triton |
-|-----------------|-------|----------|----------|-----|--------|
-| 256 | 0.8 ms | 7.1 ms | 6.0 ms | 5.8 ms | 0.5 ms |
-| 512 | 1.8 ms | 24.2 ms | 18.9 ms | 18.4 ms | 1.0 ms |
-| 1,024 | 4.9 ms | 89.8 ms | 66.7 ms | 64.2 ms | 1.8 ms |
-| 2,048 | 14.3 ms | 349.2 ms | 247.6 ms | 245.2 ms | 3.7 ms |
-| 4,096 | 52.7 ms | 1366.5 ms | 956.6 ms | 938.1 ms | 8.3 ms |
-| 8,192 | 206.7 ms | 5329.0 ms | 3760.9 ms | 3644.6 ms | 17.6 ms |
-
-### Triton Kernel Speedup vs Naive
-
-| Sequence Length | Speedup |
-|-----------------|---------|
-| 256 | 1.4x |
-| 512 | 1.9x |
-| 1,024 | 2.8x |
-| 2,048 | 3.9x |
-| 4,096 | 6.4x |
-| 8,192 | **11.8x** |
-
-### Memory vs Speed Tradeoff
-
-FlashTile's Python implementations are useful for studying the algorithm and
-validating the memory behavior. They are not the fastest path on GPU.
-
-| Implementation | Memory | Speed | Use Case |
-|---------------|--------|-------|----------|
-| Flash V1/V2 | O(N) forward/backward | Slower than naive on GPU | Algorithm study, memory-efficient training reference |
-| GQA/MQA | O(N) forward, O(N^2) backward | Slower than naive on GPU | Inference-oriented KV sharing reference |
-| Triton Kernel | O(N) forward | Fast (11.8x at 8K) | Forward-only inference |
-| PyTorch SDPA | O(N) | Fastest | Production training/inference |
-| Naive | O(N^2) | Fast fused baseline | Correctness reference, short sequences |
-
-The Python V1/V2/GQA implementations use explicit Python loops over blocks.
-Naive attention and SDPA rely on fused CUDA kernels, so they can still run
-faster despite the less favorable memory complexity. The Triton kernel shows the
-same tiled approach once the work is fused. In asymptotic terms, the tiled
-reference path replaces $O(N^2)$ score storage with an $O(N)$ working set.
-
-## Key Observations
-
-1. **Memory**: Flash V1/V2/GQA all stay at $O(N)$ peak memory; GQA is slightly lower than V1/V2 in the committed A100 run, and Triton uses more workspace to achieve much higher speed
-2. **Speed**: Only the Triton kernel is faster than naive; the Python implementations pay loop overhead
-3. **Scaling**: Memory reduction grows linearly with sequence length because
-   $`\frac{N^2}{N} = N`$
-4. **Triton**: Speedup grows with sequence length because the fused kernel amortizes launch overhead
-5. **Correctness**: Max numerical error of 1.5e-07 across all implementations (machine epsilon)
-
-## Block Size Tuning
-
-```python
-# Default (most GPUs)
-model = FlashAttentionV1(512, 8, block_size=64)
-
-# High-end GPUs (A100, H100) with more SRAM
-model = FlashAttentionV1(512, 8, block_size=128)
-
-# Limited SRAM or very large head_dim
-model = FlashAttentionV1(512, 8, block_size=32)
-```
-
-### Choosing Block Size
-
-| Block Size | SRAM Required | Best For |
-|------------|---------------|----------|
-| 32 | ~32KB per block | Limited SRAM, debugging |
-| 64 | ~128KB per block | **Default**, good balance |
-| 128 | ~512KB per block | A100/H100, large head_dim |
-
-Formula:
-
-```math
-\mathrm{SRAM}_{\mathrm{block}}
-\approx
-4 \cdot \mathrm{block\_size} \cdot \mathrm{head\_dim} \cdot \mathrm{sizeof(float)}
-```
-
-## Memory Measurement
-
-```python
-import torch
-from flashtile import FlashAttentionV2
-
-model = FlashAttentionV2(512, 8, causal=True).cuda()
-x = torch.randn(2, 2048, 512).cuda()
-
-# Reset stats
-torch.cuda.reset_peak_memory_stats()
-torch.cuda.empty_cache()
-
-# Run forward
-with torch.no_grad():
-    output, _ = model(x)
-
-# Measure
-torch.cuda.synchronize()
-peak_mb = torch.cuda.max_memory_allocated() / (1024 ** 2)
-print(f"Peak memory: {peak_mb:.1f} MB")
-
-# Get theoretical estimate
-theory = model.get_memory_usage(batch_size=2, seq_len=2048)
-print(f"Theoretical: {theory['total_mb']:.1f} MB")
-```
-
-## Profiling Tools
-
-### PyTorch Profiler
-
-```python
-with torch.profiler.profile(
-    activities=[torch.profiler.ProfilerActivity.CPU],
-    record_shapes=True
-) as prof:
-    output, _ = model(x)
-
-print(prof.key_averages().table(sort_by="cpu_time_total"))
-```
-
-### Memory Timeline (CUDA)
-
-```python
-torch.cuda.memory._record_memory_history()
-output, _ = model(x)
-torch.cuda.memory._dump_snapshot("memory_snapshot.pickle")
-```
-
-### FlashTile Built-in Profiler
-
-```python
-from flashtile.utils import MemoryProfiler
-
-with MemoryProfiler() as profiler:
-    output, _ = model(x)
-
-stats = profiler.stats
-print(f"Peak memory: {stats.peak_allocated_mb:.1f} MB")
-print(f"Duration: {stats.execution_time_ms:.2f} ms")
-```
-
-## Run Full Benchmark Suite
-
-```bash
-# Run comprehensive benchmarks
-python benchmark/benchmark.py
-
-# With custom settings (matching our A100 validation)
-python benchmark/benchmark.py --max-seq-len 8192 --batch-size 4 --embed-dim 768 --num-heads 12 --theme dark
-
-# Non-causal mode
-python benchmark/benchmark.py --max-seq-len 4096 --non-causal
-
-# Skip plots (JSON only)
-python benchmark/benchmark.py --no-plots
-```
-
-Results saved to the specified `--save-dir` with:
-- `benchmark_memory.png` - Memory scaling visualization
-- `benchmark_performance.png` - Time comparison
-- `benchmark_dashboard.png` - Comprehensive dashboard
-- `benchmark_results.json` - Raw data
-
-## Comparing with PyTorch Native
-
-For production use, compare with PyTorch's optimized implementation:
-
-```python
-import torch
-import torch.nn.functional as F
-from flashtile import FlashAttentionV2
-
-# FlashTile
-flash_model = FlashAttentionV2(512, 8, causal=True).cuda()
-
-# PyTorch Native (also uses Flash Attention under the hood on supported GPUs)
-x = torch.randn(2, 2048, 512).cuda()
-
-# FlashTile
-with torch.no_grad():
-    flash_out, _ = flash_model(x)
-
-# PyTorch Native (requires manual QKV projection)
-qkv_proj = flash_model.qkv_proj
-qkv = qkv_proj(x)
-q, k, v = qkv.chunk(3, dim=-1)
-q = q.view(2, 2048, 8, 64).transpose(1, 2)
-k = k.view(2, 2048, 8, 64).transpose(1, 2)
-v = v.view(2, 2048, 8, 64).transpose(1, 2)
-
-with torch.no_grad():
-    native_out = F.scaled_dot_product_attention(q, k, v, is_causal=True)
-
-# Compare
-print(
-    "Output match:",
-    torch.allclose(
-        flash_out,
-        native_out.transpose(1, 2).reshape(2, 2048, 512),
-        atol=1e-3,
-    ),
-)
-```
-
-In practice, PyTorch native is much faster than FlashTile's Python implementation. FlashTile is best used as a reference implementation; PyTorch native is the production path.
-
-## Optimization Tips
-
-### 1. Use Causal Masking for Decoders
-
-```python
-# Saves ~50% compute
-model = FlashAttentionV2(512, 8, causal=True)
-```
-
-### 2. Use torch.compile
-
-```python
-model = torch.compile(model)
-```
-
-### 3. Use FP16/BF16
-
-```python
-model = model.half()  # or .bfloat16()
-x = x.half()
-```
-
-> **Pitfall**: Custom autograd functions upcast to float32 internally, so mixed precision is safe, but always use `torch.amp.autocast` for best results.
-
-### 4. Use GQA for Inference
-
-```python
-from flashtile import GroupedQueryAttention
-model = GroupedQueryAttention(512, 8, num_kv_heads=2)  # 4x KV cache savings
-```
-
-### 5. Use Appropriate Block Size
-
-```python
-# Larger blocks = fewer iterations, but more SRAM
-model = FlashAttentionV2(512, 8, block_size=128)  # If you have SRAM to spare
-```
-
-## Trade-offs
-
-| Aspect | FlashTile Python | PyTorch SDPA | Triton Kernel |
-|--------|------------------|--------------|---------------|
-| Memory | O(N) | O(N) | O(N) |
-| Speed | Slow (Python loops) | Fast (CUDA) | Fast (11.8x at 8K) |
-| Backward | Yes (V1/V2) | Yes | No |
-| Customizable | High | Low | Limited |
-| Educational | High | Low | Limited |
-| Production | For learning | Recommended | Forward only |
-
-**Choose FlashTile Python when:**
-- Learning how Flash Attention works
-- Customizing the algorithm
-- Prototyping new attention variants
-
-**Choose PyTorch SDPA when:**
-- Maximum speed needed
-- Production training/inference
-- Backward pass required
-
-**Choose Triton kernel when:**
-- Forward-only inference
-- Learning GPU kernel development
-- Customizing low-level details
-
-*For architecture details, see [ARCHITECTURE.md](ARCHITECTURE.md). For usage examples, see [USAGE.md](USAGE.md).*
+# FlashTile results across GPUs
+
+Every configuration from the final H200, B200 and RTX PRO 6000 runs (generated by `benchmark/report.py`).
+"ratio" is FlashTile's time divided by the fastest PyTorch SDPA backend's time on the same inputs, so below 1.0 means
+FlashTile was faster. bf16, batch x length = 16,384 tokens.
+
+![cross-GPU dashboard](cross_gpu_dashboard.png)
+
+## NVIDIA B200
+
+| workload | causal | mode | L | FlashTile TFLOP/s | best SDPA | SDPA TFLOP/s | ratio | vs sdpa-flash | atomic-dQ TFLOP/s | atomic-dQ ratio |
+|---|---|---|---:|---:|---|---:|---:|---:|---:|---:|
+| mha-d128 | True | fwd | 512 | 209.5 | sdpa-cudnn | 492.4 | 2.35 | 0.92 | - | - |
+| mha-d128 | True | fwd | 1024 | 290.8 | sdpa-cudnn | 705.1 | 2.42 | 0.91 | - | - |
+| mha-d128 | True | fwd | 2048 | 393.6 | sdpa-cudnn | 911.4 | 2.32 | 0.77 | - | - |
+| mha-d128 | True | fwd | 4096 | 459.3 | sdpa-cudnn | 1053.1 | 2.29 | 0.71 | - | - |
+| mha-d128 | True | fwd | 8192 | 534.5 | sdpa-cudnn | 1160.5 | 2.17 | 0.63 | - | - |
+| mha-d128 | True | fwd | 16384 | 570.5 | sdpa-cudnn | 1201.5 | 2.11 | 0.60 | - | - |
+| mha-d128 | True | fwd+bwd | 512 | 178.3 | sdpa-cudnn | 397.1 | 2.23 | 0.78 | 148.3 | 2.68 |
+| mha-d128 | True | fwd+bwd | 1024 | 257.4 | sdpa-cudnn | 605.8 | 2.35 | 0.77 | 191.7 | 3.16 |
+| mha-d128 | True | fwd+bwd | 2048 | 348.4 | sdpa-cudnn | 805.7 | 2.31 | 0.71 | 239.4 | 3.37 |
+| mha-d128 | True | fwd+bwd | 4096 | 391.7 | sdpa-cudnn | 963.3 | 2.46 | 0.72 | 277.8 | 3.47 |
+| mha-d128 | True | fwd+bwd | 8192 | 452.1 | sdpa-cudnn | 1069.3 | 2.36 | 0.68 | 309.3 | 3.46 |
+| mha-d128 | True | fwd+bwd | 16384 | 472.4 | sdpa-cudnn | 1145.6 | 2.42 | 0.69 | 319.2 | 3.59 |
+| mha-d128 | False | fwd | 512 | 316.3 | sdpa-cudnn | 875.9 | 2.77 | 1.07 | - | - |
+| mha-d128 | False | fwd | 1024 | 396.2 | sdpa-cudnn | 1067.2 | 2.69 | 0.92 | - | - |
+| mha-d128 | False | fwd | 2048 | 452.5 | sdpa-cudnn | 1200.9 | 2.65 | 0.84 | - | - |
+| mha-d128 | False | fwd | 4096 | 514.4 | sdpa-cudnn | 1275.9 | 2.48 | 0.76 | - | - |
+| mha-d128 | False | fwd | 8192 | 540.4 | sdpa-cudnn | 1302.5 | 2.41 | 0.73 | - | - |
+| mha-d128 | False | fwd | 16384 | 566.5 | sdpa-cudnn | 1361.5 | 2.40 | 0.70 | - | - |
+| mha-d128 | False | fwd+bwd | 512 | 273.2 | sdpa-cudnn | 664.7 | 2.43 | 0.86 | 207.0 | 3.21 |
+| mha-d128 | False | fwd+bwd | 1024 | 348.1 | sdpa-cudnn | 862.5 | 2.48 | 0.84 | 255.6 | 3.37 |
+| mha-d128 | False | fwd+bwd | 2048 | 390.2 | sdpa-cudnn | 1009.9 | 2.59 | 0.84 | 282.3 | 3.58 |
+| mha-d128 | False | fwd+bwd | 4096 | 435.3 | sdpa-cudnn | 1113.8 | 2.56 | 0.81 | 304.9 | 3.65 |
+| mha-d128 | False | fwd+bwd | 8192 | 460.0 | sdpa-cudnn | 1161.6 | 2.53 | 0.79 | 316.7 | 3.67 |
+| mha-d128 | False | fwd+bwd | 16384 | 470.8 | sdpa-cudnn | 1188.2 | 2.52 | 0.79 | 322.5 | 3.68 |
+| mha-d64 | True | fwd | 512 | 189.0 | sdpa-cudnn | 354.9 | 1.88 | 0.86 | - | - |
+| mha-d64 | True | fwd | 1024 | 282.8 | sdpa-cudnn | 499.8 | 1.77 | 0.82 | - | - |
+| mha-d64 | True | fwd | 2048 | 381.5 | sdpa-cudnn | 638.5 | 1.67 | 0.76 | - | - |
+| mha-d64 | True | fwd | 4096 | 341.3 | sdpa-cudnn | 741.9 | 2.17 | 0.92 | - | - |
+| mha-d64 | True | fwd | 8192 | 500.1 | sdpa-cudnn | 809.7 | 1.62 | 0.66 | - | - |
+| mha-d64 | True | fwd | 16384 | 523.6 | sdpa-cudnn | 851.7 | 1.63 | 0.64 | - | - |
+| mha-d64 | True | fwd+bwd | 512 | 152.4 | sdpa-cudnn | 325.1 | 2.13 | 0.86 | 152.9 | 2.13 |
+| mha-d64 | True | fwd+bwd | 1024 | 216.0 | sdpa-cudnn | 472.8 | 2.19 | 0.86 | 212.0 | 2.23 |
+| mha-d64 | True | fwd+bwd | 2048 | 274.5 | sdpa-cudnn | 614.5 | 2.24 | 0.86 | 276.1 | 2.23 |
+| mha-d64 | True | fwd+bwd | 4096 | 265.2 | sdpa-cudnn | 711.9 | 2.68 | 1.02 | 299.5 | 2.38 |
+| mha-d64 | True | fwd+bwd | 8192 | 330.9 | sdpa-cudnn | 774.0 | 2.34 | 0.89 | 352.7 | 2.19 |
+| mha-d64 | True | fwd+bwd | 16384 | 360.4 | sdpa-cudnn | 813.6 | 2.26 | 0.86 | 372.7 | 2.18 |
+| gqa4-d128 | True | fwd | 512 | 230.4 | sdpa-cudnn | 558.6 | 2.42 | 0.88 | - | - |
+| gqa4-d128 | True | fwd | 1024 | 337.9 | sdpa-cudnn | 781.4 | 2.31 | 0.84 | - | - |
+| gqa4-d128 | True | fwd | 2048 | 445.1 | sdpa-cudnn | 977.5 | 2.20 | 0.74 | - | - |
+| gqa4-d128 | True | fwd | 4096 | 514.2 | sdpa-cudnn | 1110.0 | 2.16 | 0.68 | - | - |
+| gqa4-d128 | True | fwd | 8192 | 566.1 | sdpa-cudnn | 1201.8 | 2.12 | 0.63 | - | - |
+| gqa4-d128 | True | fwd | 16384 | 580.8 | sdpa-cudnn | 1261.3 | 2.17 | 0.63 | - | - |
+| gqa4-d128 | True | fwd+bwd | 512 | 223.2 | sdpa-cudnn | 388.0 | 1.74 | 0.60 | 180.4 | 2.15 |
+| gqa4-d128 | True | fwd+bwd | 1024 | 309.1 | sdpa-cudnn | 589.4 | 1.91 | 0.63 | 229.1 | 2.57 |
+| gqa4-d128 | True | fwd+bwd | 2048 | 376.1 | sdpa-cudnn | 786.3 | 2.09 | 0.66 | 275.3 | 2.86 |
+| gqa4-d128 | True | fwd+bwd | 4096 | 437.7 | sdpa-cudnn | 965.8 | 2.21 | 0.67 | 305.0 | 3.17 |
+| gqa4-d128 | True | fwd+bwd | 8192 | 478.7 | sdpa-cudnn | 1076.5 | 2.25 | 0.67 | 323.2 | 3.33 |
+| gqa4-d128 | True | fwd+bwd | 16384 | 492.4 | sdpa-cudnn | 1140.3 | 2.32 | 0.68 | 329.5 | 3.46 |
+| qwen3.5-d256 | True | fwd | 512 | 168.7 | sdpa-cudnn | 584.5 | 3.46 | 1.61 | - | - |
+| qwen3.5-d256 | True | fwd | 1024 | 246.7 | sdpa-cudnn | 831.5 | 3.37 | 1.28 | - | - |
+| qwen3.5-d256 | True | fwd | 2048 | 320.9 | sdpa-cudnn | 1085.5 | 3.38 | 1.07 | - | - |
+| qwen3.5-d256 | True | fwd | 4096 | 375.9 | sdpa-cudnn | 1276.6 | 3.40 | 0.96 | - | - |
+| qwen3.5-d256 | True | fwd | 8192 | 407.0 | sdpa-cudnn | 1390.7 | 3.42 | 0.91 | - | - |
+| qwen3.5-d256 | True | fwd | 16384 | 435.2 | sdpa-cudnn | 1495.7 | 3.44 | 0.86 | - | - |
+| qwen3.5-d256 | True | fwd+bwd | 512 | 147.5 | sdpa-cudnn | 342.8 | 2.32 | 0.93 | 138.2 | 2.48 |
+| qwen3.5-d256 | True | fwd+bwd | 1024 | 196.6 | sdpa-cudnn | 514.3 | 2.62 | 0.96 | 173.4 | 2.97 |
+| qwen3.5-d256 | True | fwd+bwd | 2048 | 235.9 | sdpa-cudnn | 693.9 | 2.94 | 0.99 | 202.8 | 3.42 |
+| qwen3.5-d256 | True | fwd+bwd | 4096 | 262.9 | sdpa-cudnn | 837.1 | 3.18 | 1.02 | 221.4 | 3.78 |
+| qwen3.5-d256 | True | fwd+bwd | 8192 | 279.1 | sdpa-cudnn | 926.1 | 3.32 | 1.04 | 232.3 | 3.99 |
+| qwen3.5-d256 | True | fwd+bwd | 16384 | 288.7 | sdpa-cudnn | 1004.1 | 3.48 | 1.06 | 239.4 | 4.19 |
+
+## NVIDIA H200
+
+| workload | causal | mode | L | FlashTile TFLOP/s | best SDPA | SDPA TFLOP/s | ratio | vs sdpa-flash | atomic-dQ TFLOP/s | atomic-dQ ratio |
+|---|---|---|---:|---:|---|---:|---:|---:|---:|---:|
+| mha-d128 | True | fwd | 512 | 180.9 | sdpa-cudnn | 312.8 | 1.73 | 1.01 | - | - |
+| mha-d128 | True | fwd | 1024 | 249.4 | sdpa-cudnn | 396.8 | 1.59 | 0.97 | - | - |
+| mha-d128 | True | fwd | 2048 | 316.6 | sdpa-cudnn | 470.2 | 1.49 | 0.88 | - | - |
+| mha-d128 | True | fwd | 4096 | 375.8 | sdpa-cudnn | 516.8 | 1.38 | 0.80 | - | - |
+| mha-d128 | True | fwd | 8192 | 418.2 | sdpa-cudnn | 553.2 | 1.32 | 0.75 | - | - |
+| mha-d128 | True | fwd | 16384 | 446.1 | sdpa-cudnn | 568.1 | 1.27 | 0.71 | - | - |
+| mha-d128 | True | fwd+bwd | 512 | 149.9 | sdpa-cudnn | 233.0 | 1.55 | 0.86 | 123.4 | 1.89 |
+| mha-d128 | True | fwd+bwd | 1024 | 198.0 | sdpa-cudnn | 326.3 | 1.65 | 0.93 | 160.8 | 2.03 |
+| mha-d128 | True | fwd+bwd | 2048 | 241.8 | sdpa-cudnn | 402.1 | 1.66 | 0.94 | 206.6 | 1.95 |
+| mha-d128 | True | fwd+bwd | 4096 | 281.8 | sdpa-cudnn | 464.2 | 1.65 | 0.94 | 236.8 | 1.96 |
+| mha-d128 | True | fwd+bwd | 8192 | 318.2 | sdpa-cudnn | 501.8 | 1.58 | 0.91 | 264.4 | 1.90 |
+| mha-d128 | True | fwd+bwd | 16384 | 333.9 | sdpa-cudnn | 534.9 | 1.60 | 0.93 | 281.2 | 1.90 |
+| mha-d128 | False | fwd | 512 | 287.8 | sdpa-cudnn | 470.0 | 1.63 | 1.01 | - | - |
+| mha-d128 | False | fwd | 1024 | 328.7 | sdpa-cudnn | 533.0 | 1.62 | 0.96 | - | - |
+| mha-d128 | False | fwd | 2048 | 364.0 | sdpa-cudnn | 576.9 | 1.58 | 0.90 | - | - |
+| mha-d128 | False | fwd | 4096 | 408.9 | sdpa-cudnn | 594.4 | 1.45 | 0.83 | - | - |
+| mha-d128 | False | fwd | 8192 | 435.8 | sdpa-cudnn | 602.6 | 1.38 | 0.79 | - | - |
+| mha-d128 | False | fwd | 16384 | 458.0 | sdpa-cudnn | 607.4 | 1.33 | 0.76 | - | - |
+| mha-d128 | False | fwd+bwd | 512 | 215.2 | sdpa-cudnn | 358.2 | 1.66 | 0.93 | 170.6 | 2.10 |
+| mha-d128 | False | fwd+bwd | 1024 | 243.8 | sdpa-cudnn | 439.4 | 1.80 | 1.01 | 189.1 | 2.32 |
+| mha-d128 | False | fwd+bwd | 2048 | 269.4 | sdpa-cudnn | 498.9 | 1.85 | 1.04 | 218.4 | 2.28 |
+| mha-d128 | False | fwd+bwd | 4096 | 305.9 | sdpa-cudnn | 529.4 | 1.73 | 0.98 | 249.3 | 2.12 |
+| mha-d128 | False | fwd+bwd | 8192 | 324.8 | sdpa-cudnn | 546.3 | 1.68 | 0.96 | 269.7 | 2.03 |
+| mha-d128 | False | fwd+bwd | 16384 | 334.7 | sdpa-cudnn | 556.2 | 1.66 | 0.95 | 249.9 | 2.23 |
+| mha-d64 | True | fwd | 512 | 181.8 | sdpa-cudnn | 248.7 | 1.37 | 0.83 | - | - |
+| mha-d64 | True | fwd | 1024 | 236.8 | sdpa-cudnn | 321.2 | 1.36 | 0.90 | - | - |
+| mha-d64 | True | fwd | 2048 | 287.6 | sdpa-cudnn | 371.1 | 1.29 | 0.89 | - | - |
+| mha-d64 | True | fwd | 4096 | 281.1 | sdpa-cudnn | 403.3 | 1.43 | 0.99 | - | - |
+| mha-d64 | True | fwd | 8192 | 361.1 | sdpa-cudnn | 427.5 | 1.18 | 0.80 | - | - |
+| mha-d64 | True | fwd | 16384 | 388.2 | sdpa-cudnn | 439.8 | 1.13 | 0.76 | - | - |
+| mha-d64 | True | fwd+bwd | 512 | 148.6 | sdpa-cudnn | 185.4 | 1.25 | 0.78 | 128.9 | 1.44 |
+| mha-d64 | True | fwd+bwd | 1024 | 186.3 | sdpa-cudnn | 266.6 | 1.43 | 0.90 | 164.9 | 1.62 |
+| mha-d64 | True | fwd+bwd | 2048 | 217.5 | sdpa-cudnn | 332.3 | 1.53 | 0.96 | 186.3 | 1.78 |
+| mha-d64 | True | fwd+bwd | 4096 | 241.8 | sdpa-cudnn | 372.0 | 1.54 | 1.00 | 229.8 | 1.62 |
+| mha-d64 | True | fwd+bwd | 8192 | 278.1 | sdpa-cudnn | 409.1 | 1.47 | 0.94 | 270.0 | 1.52 |
+| mha-d64 | True | fwd+bwd | 16384 | 296.1 | sdpa-cudnn | 428.9 | 1.45 | 0.95 | 283.7 | 1.51 |
+| gqa4-d128 | True | fwd | 512 | 233.1 | sdpa-cudnn | 340.8 | 1.46 | 0.83 | - | - |
+| gqa4-d128 | True | fwd | 1024 | 287.5 | sdpa-cudnn | 428.1 | 1.49 | 0.90 | - | - |
+| gqa4-d128 | True | fwd | 2048 | 349.7 | sdpa-cudnn | 494.4 | 1.41 | 0.85 | - | - |
+| gqa4-d128 | True | fwd | 4096 | 397.7 | sdpa-cudnn | 539.5 | 1.36 | 0.80 | - | - |
+| gqa4-d128 | True | fwd | 8192 | 430.0 | sdpa-cudnn | 567.8 | 1.32 | 0.77 | - | - |
+| gqa4-d128 | True | fwd | 16384 | 453.5 | sdpa-cudnn | 583.6 | 1.29 | 0.74 | - | - |
+| gqa4-d128 | True | fwd+bwd | 512 | 187.4 | sdpa-cudnn | 227.1 | 1.21 | 0.65 | 145.0 | 1.57 |
+| gqa4-d128 | True | fwd+bwd | 1024 | 238.7 | sdpa-cudnn | 324.2 | 1.36 | 0.75 | 190.3 | 1.70 |
+| gqa4-d128 | True | fwd+bwd | 2048 | 277.0 | sdpa-cudnn | 404.0 | 1.46 | 0.83 | 226.0 | 1.79 |
+| gqa4-d128 | True | fwd+bwd | 4096 | 312.3 | sdpa-cudnn | 466.6 | 1.49 | 0.86 | 254.5 | 1.83 |
+| gqa4-d128 | True | fwd+bwd | 8192 | 334.8 | sdpa-cudnn | 510.8 | 1.53 | 0.87 | 277.9 | 1.84 |
+| gqa4-d128 | True | fwd+bwd | 16384 | 347.6 | sdpa-cudnn | 534.9 | 1.54 | 0.91 | 288.4 | 1.85 |
+| qwen3.5-d256 | True | fwd | 512 | 223.9 | sdpa-cudnn | 367.0 | 1.64 | 0.98 | - | - |
+| qwen3.5-d256 | True | fwd | 1024 | 278.0 | sdpa-cudnn | 463.5 | 1.67 | 0.92 | - | - |
+| qwen3.5-d256 | True | fwd | 2048 | 342.3 | sdpa-cudnn | 533.3 | 1.56 | 0.81 | - | - |
+| qwen3.5-d256 | True | fwd | 4096 | 394.0 | sdpa-cudnn | 582.1 | 1.48 | 0.74 | - | - |
+| qwen3.5-d256 | True | fwd | 8192 | 431.1 | sdpa-cudnn | 609.7 | 1.41 | 0.70 | - | - |
+| qwen3.5-d256 | True | fwd | 16384 | 460.7 | sdpa-cudnn | 630.0 | 1.37 | 0.67 | - | - |
+| qwen3.5-d256 | True | fwd+bwd | 512 | 144.4 | sdpa-cudnn | 190.4 | 1.32 | 0.82 | 114.0 | 1.67 |
+| qwen3.5-d256 | True | fwd+bwd | 1024 | 169.2 | sdpa-cudnn | 266.6 | 1.58 | 0.98 | 140.7 | 1.89 |
+| qwen3.5-d256 | True | fwd+bwd | 2048 | 193.8 | sdpa-cudnn | 331.7 | 1.71 | 1.07 | 161.0 | 2.06 |
+| qwen3.5-d256 | True | fwd+bwd | 4096 | 211.0 | sdpa-cudnn | 378.9 | 1.80 | 1.13 | 172.5 | 2.20 |
+| qwen3.5-d256 | True | fwd+bwd | 8192 | 221.2 | sdpa-cudnn | 410.2 | 1.85 | 1.16 | 179.3 | 2.29 |
+| qwen3.5-d256 | True | fwd+bwd | 16384 | 226.3 | sdpa-cudnn | 411.3 | 1.82 | 1.19 | 182.6 | 2.25 |
+
+## NVIDIA RTX PRO 6000 Blackwell Server Edition
+
+| workload | causal | mode | L | FlashTile TFLOP/s | best SDPA | SDPA TFLOP/s | ratio | vs sdpa-flash | atomic-dQ TFLOP/s | atomic-dQ ratio |
+|---|---|---|---:|---:|---|---:|---:|---:|---:|---:|
+| mha-d128 | True | fwd | 512 | 141.7 | sdpa-cudnn | 176.2 | 1.24 | 1.20 | - | - |
+| mha-d128 | True | fwd | 1024 | 218.6 | sdpa-cudnn | 241.4 | 1.10 | 1.04 | - | - |
+| mha-d128 | True | fwd | 2048 | 292.0 | sdpa-cudnn | 280.0 | 0.96 | 0.91 | - | - |
+| mha-d128 | True | fwd | 4096 | 323.2 | sdpa-cudnn | 306.1 | 0.95 | 0.90 | - | - |
+| mha-d128 | True | fwd | 8192 | 336.7 | sdpa-cudnn | 321.6 | 0.96 | 0.91 | - | - |
+| mha-d128 | True | fwd | 16384 | 347.0 | sdpa-cudnn | 330.3 | 0.95 | 0.91 | - | - |
+| mha-d128 | True | fwd+bwd | 512 | 110.5 | sdpa-flash | 99.2 | 0.90 | 0.90 | 64.4 | 1.54 |
+| mha-d128 | True | fwd+bwd | 1024 | 161.2 | sdpa-flash | 166.9 | 1.04 | 1.04 | 85.1 | 1.96 |
+| mha-d128 | True | fwd+bwd | 2048 | 195.9 | sdpa-flash | 222.6 | 1.14 | 1.14 | 129.1 | 1.72 |
+| mha-d128 | True | fwd+bwd | 4096 | 214.9 | sdpa-flash | 264.9 | 1.23 | 1.23 | 185.6 | 1.43 |
+| mha-d128 | True | fwd+bwd | 8192 | 227.2 | sdpa-flash | 291.9 | 1.28 | 1.28 | 208.8 | 1.40 |
+| mha-d128 | True | fwd+bwd | 16384 | 231.1 | sdpa-flash | 311.0 | 1.35 | 1.35 | 222.8 | 1.40 |
+| mha-d128 | False | fwd | 512 | 167.7 | sdpa-cudnn | 272.4 | 1.62 | 1.47 | - | - |
+| mha-d128 | False | fwd | 1024 | 260.2 | sdpa-cudnn | 314.2 | 1.21 | 1.12 | - | - |
+| mha-d128 | False | fwd | 2048 | 310.4 | sdpa-cudnn | 336.7 | 1.08 | 1.01 | - | - |
+| mha-d128 | False | fwd | 4096 | 328.1 | sdpa-cudnn | 344.7 | 1.05 | 1.00 | - | - |
+| mha-d128 | False | fwd | 8192 | 340.6 | sdpa-cudnn | 350.3 | 1.03 | 0.98 | - | - |
+| mha-d128 | False | fwd | 16384 | 348.5 | sdpa-cudnn | 353.7 | 1.01 | 0.97 | - | - |
+| mha-d128 | False | fwd+bwd | 512 | 129.9 | sdpa-flash | 169.4 | 1.30 | 1.30 | 76.0 | 2.23 |
+| mha-d128 | False | fwd+bwd | 1024 | 178.0 | sdpa-flash | 231.9 | 1.30 | 1.30 | 87.0 | 2.67 |
+| mha-d128 | False | fwd+bwd | 2048 | 202.0 | sdpa-flash | 278.6 | 1.38 | 1.38 | 129.4 | 2.15 |
+| mha-d128 | False | fwd+bwd | 4096 | 216.7 | sdpa-flash | 307.1 | 1.42 | 1.42 | 196.9 | 1.56 |
+| mha-d128 | False | fwd+bwd | 8192 | 226.0 | sdpa-flash | 321.0 | 1.42 | 1.42 | 213.8 | 1.50 |
+| mha-d128 | False | fwd+bwd | 16384 | 230.6 | sdpa-flash | 329.1 | 1.43 | 1.43 | 221.6 | 1.49 |
+| mha-d64 | True | fwd | 512 | 152.2 | sdpa-flash | 173.4 | 1.14 | 1.14 | - | - |
+| mha-d64 | True | fwd | 1024 | 219.8 | sdpa-flash | 251.2 | 1.14 | 1.14 | - | - |
+| mha-d64 | True | fwd | 2048 | 279.5 | sdpa-flash | 286.0 | 1.02 | 1.02 | - | - |
+| mha-d64 | True | fwd | 4096 | 286.4 | sdpa-flash | 310.3 | 1.08 | 1.08 | - | - |
+| mha-d64 | True | fwd | 8192 | 302.7 | sdpa-flash | 323.7 | 1.07 | 1.07 | - | - |
+| mha-d64 | True | fwd | 16384 | 348.1 | sdpa-flash | 331.7 | 0.95 | 0.95 | - | - |
+| mha-d64 | True | fwd+bwd | 512 | 116.4 | sdpa-flash | 100.2 | 0.86 | 0.86 | 85.3 | 1.18 |
+| mha-d64 | True | fwd+bwd | 1024 | 179.1 | sdpa-flash | 168.2 | 0.94 | 0.94 | 124.5 | 1.35 |
+| mha-d64 | True | fwd+bwd | 2048 | 220.4 | sdpa-flash | 225.6 | 1.02 | 1.02 | 162.1 | 1.39 |
+| mha-d64 | True | fwd+bwd | 4096 | 239.9 | sdpa-flash | 268.8 | 1.12 | 1.12 | 210.7 | 1.28 |
+| mha-d64 | True | fwd+bwd | 8192 | 255.0 | sdpa-flash | 297.7 | 1.17 | 1.17 | 253.8 | 1.17 |
+| mha-d64 | True | fwd+bwd | 16384 | 268.8 | sdpa-flash | 316.1 | 1.18 | 1.18 | 280.0 | 1.13 |
+| gqa4-d128 | True | fwd | 512 | 205.5 | sdpa-cudnn | 209.6 | 1.02 | 0.97 | - | - |
+| gqa4-d128 | True | fwd | 1024 | 264.1 | sdpa-cudnn | 257.8 | 0.98 | 0.95 | - | - |
+| gqa4-d128 | True | fwd | 2048 | 305.3 | sdpa-cudnn | 295.9 | 0.97 | 0.93 | - | - |
+| gqa4-d128 | True | fwd | 4096 | 330.7 | sdpa-cudnn | 317.5 | 0.96 | 0.93 | - | - |
+| gqa4-d128 | True | fwd | 8192 | 342.9 | sdpa-cudnn | 333.0 | 0.97 | 0.93 | - | - |
+| gqa4-d128 | True | fwd | 16384 | 350.1 | sdpa-cudnn | 341.7 | 0.98 | 0.93 | - | - |
+| gqa4-d128 | True | fwd+bwd | 512 | 127.2 | sdpa-cudnn | 96.0 | 0.75 | 0.74 | 69.2 | 1.39 |
+| gqa4-d128 | True | fwd+bwd | 1024 | 174.3 | sdpa-flash | 156.2 | 0.90 | 0.90 | 108.9 | 1.44 |
+| gqa4-d128 | True | fwd+bwd | 2048 | 201.5 | sdpa-flash | 216.0 | 1.07 | 1.07 | 169.2 | 1.28 |
+| gqa4-d128 | True | fwd+bwd | 4096 | 218.1 | sdpa-flash | 262.5 | 1.20 | 1.20 | 202.5 | 1.30 |
+| gqa4-d128 | True | fwd+bwd | 8192 | 227.8 | sdpa-flash | 293.4 | 1.29 | 1.29 | 218.3 | 1.34 |
+| gqa4-d128 | True | fwd+bwd | 16384 | 232.6 | sdpa-flash | 311.4 | 1.34 | 1.34 | 226.7 | 1.37 |
+| qwen3.5-d256 | True | fwd | 512 | 143.2 | sdpa-flash | 208.4 | 1.46 | 1.46 | - | - |
+| qwen3.5-d256 | True | fwd | 1024 | 169.8 | sdpa-flash | 256.5 | 1.51 | 1.51 | - | - |
+| qwen3.5-d256 | True | fwd | 2048 | 184.8 | sdpa-flash | 286.6 | 1.55 | 1.55 | - | - |
+| qwen3.5-d256 | True | fwd | 4096 | 195.7 | sdpa-flash | 305.6 | 1.56 | 1.56 | - | - |
+| qwen3.5-d256 | True | fwd | 8192 | 203.5 | sdpa-flash | 315.9 | 1.55 | 1.55 | - | - |
+| qwen3.5-d256 | True | fwd | 16384 | 206.7 | sdpa-flash | 322.2 | 1.56 | 1.56 | - | - |
+| qwen3.5-d256 | True | fwd+bwd | 512 | 95.3 | sdpa-flash | 86.8 | 0.91 | 0.91 | 53.9 | 1.61 |
+| qwen3.5-d256 | True | fwd+bwd | 1024 | 117.4 | sdpa-flash | 131.2 | 1.12 | 1.12 | 94.8 | 1.38 |
+| qwen3.5-d256 | True | fwd+bwd | 2048 | 129.2 | sdpa-flash | 173.5 | 1.34 | 1.34 | 130.8 | 1.33 |
+| qwen3.5-d256 | True | fwd+bwd | 4096 | 135.7 | sdpa-flash | 205.9 | 1.52 | 1.52 | 151.7 | 1.36 |
+| qwen3.5-d256 | True | fwd+bwd | 8192 | 139.4 | sdpa-flash | 225.7 | 1.62 | 1.62 | 163.5 | 1.38 |
+| qwen3.5-d256 | True | fwd+bwd | 16384 | 141.3 | sdpa-flash | 235.5 | 1.67 | 1.67 | 168.2 | 1.40 |
+
+
+## Inside a real model: Qwen3.8-27B on H200
+
+Not generated by `report.py`. These are times inside the 16 softmax-attention layers of
+Qwen3.8-27B (24 q / 4 kv heads, d=256, bf16, batch 1), one prefill, median of 3. Same "ratio" as
+above: FlashTile's time over the fastest SDPA backend's, which was cuDNN.
+
+| prompt tokens | cuDNN | FA2 | FlashTile | ratio | vs FA2 |
+|---:|---:|---:|---:|---:|---:|
+| 22,263 | 161.8 ms | 380.1 ms | 281.8 ms | 1.74 | 0.74 |
+| 33,846 | 370.8 ms | 819.1 ms | 627.1 ms | 1.69 | 0.77 |
+
+Decode attention per token at those lengths: FlashTile 9.37 / 12.62 ms, FA2 2.16 / 2.25 ms, cuDNN
+2.42 / 2.44 ms. Full results: [`flashtile_results_H200/qwen3.8-27b/`](../flashtile_results_H200/qwen3.8-27b/).

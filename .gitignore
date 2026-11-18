@@ -25,7 +25,6 @@ venv/
 env/
 ENV/
 .venv
-bin/
 
 # PyTorch
 *.pth
@@ -72,3 +71,11 @@ ME/
 # Build/deployment artifacts
 *.zip
 run_flashtile.sh
+.agents/
+
+# Private notes (not for the public repo)
+PRIVATE/
+
+# Text for the Qwen3.5 evaluation (see modal_app.py) and raw local runs
+corpus/
+results/

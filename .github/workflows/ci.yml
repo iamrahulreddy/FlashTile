@@ -1,44 +1,39 @@
-﻿name: CI
+name: CI
+
+# CPU only: the float64 oracle, the tiled PyTorch path, gradients, gradcheck and the contract
+# errors (tests/test_attention.py). GPU tests (test_cuda, test_triton, test_hf) skip themselves
+# without CUDA; they run on real GPUs through `modal run modal_app.py`.
 
 on:
   push:
-    branches: [main, master]
   pull_request:
-    branches: [main, master]
 
 jobs:
-  test:
-    name: Test (Python ${{ matrix.python-version }})
+  cpu-tests:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
-
+        python-version: ["3.11", "3.12"]
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
+      - name: Install
         run: |
           python -m pip install --upgrade pip
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install pytest numpy
-          pip install -e .
+          pip install -e ".[dev]"
 
-      - name: Verify installation
+      - name: Byte-compile every Python file
+        run: python -m compileall -q flashtile tests benchmark modal_app.py
+
+      - name: Import and backend selection
         run: |
-          python -c "from flashtile import NaiveAttention, FlashAttentionV1; print('Import OK')"
+          python -c "import flashtile, torch; q = torch.randn(1, 2, 8, 4); print(flashtile.select_backend(q, q, q))"
 
-      - name: Run tests
-        run: |
-          # GPU-dependent tests (test_triton, test_stress, test_performance, test_precision, test_torch_compile)
-          # are excluded from CI — they require A100/H100 hardware and are validated manually.
-          # See flashtile_results_A100/ and flashtile_results_H100/ for full GPU test evidence.
-          pytest tests/test_correctness.py tests/test_factory.py tests/test_flash_v2.py tests/test_gqa.py tests/test_masked_attention.py tests/test_sliding_window.py -v --tb=short
-
+      - name: Tests
+        run: pytest -v -rA

@@ -1,0 +1,9 @@
+platform linux -- Python 3.12.10, torch 2.15.0+cu132, triton 3.9.0, GPU NVIDIA B200
+collected 4 items
+
+tests/test_hf.py::test_prefill_logits_match_eager PASSED                      [ 25%]
+tests/test_hf.py::test_cached_greedy_decode_matches_eager PASSED              [ 50%]
+tests/test_hf.py::test_padding_mask_uses_tiled_path_and_matches PASSED        [ 75%]
+tests/test_hf.py::test_training_gradients_match_eager PASSED                  [100%]
+
+============================= 4 passed in 74.53s =============================

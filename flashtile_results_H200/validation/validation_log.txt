@@ -1,0 +1,49 @@
+Date: Tue Nov 17 16:05:23 UTC 2026
+GPU: NVIDIA H200  sm_90  140 GiB
+Python 3.12.10  torch 2.15.0+cu132  CUDA 13.2  triton 3.9.0
+
+Backend selection (auto):
+  bf16 causal prefill                -> triton  (supported)
+  bf16 decode, CPU positions         -> triton  (supported)
+  bf16 Boolean mask                  -> tiled   (arbitrary Boolean masks are only handled by the tiled path)
+  bf16 causal, positions with gaps   -> tiled   (causal positions are not contiguous ranges)
+  fp64 inputs                        -> tiled   (dtype torch.float64 is not handled by the triton kernels)
+  CPU tensors                        -> tiled   (tensors are on cpu, triton needs CUDA)
+
+Forward pass (B=2, Hq=8, Hkv=2, L=512, d=64, bf16, causal):
+  FlashTile triton           OK   shape=[2, 8, 512, 64]
+  FlashTile tiled            OK   shape=[2, 8, 512, 64]
+  Reference (fp64 oracle)    OK   shape=[2, 8, 512, 64]
+  PyTorch SDPA               OK   shape=[2, 8, 512, 64]
+
+Correctness (vs fp64 oracle, same bf16 inputs):
+  FlashTile triton           max_diff=0.00776108  mean_diff=2.06e-04  PASS
+  FlashTile tiled            max_diff=0.00776108  mean_diff=1.44e-04  PASS
+  PyTorch SDPA               max_diff=0.00776108  mean_diff=2.08e-04  PASS
+
+Backward pass (loss = sum(out * random), gradients vs fp64 oracle):
+  FlashTile triton           PASS  dq rel err=3.71e-03  dk rel err=4.80e-03  dv rel err=4.04e-03
+  FlashTile tiled            PASS  dq rel err=2.82e-03  dk rel err=3.07e-03  dv rel err=3.96e-03
+
+Memory, measured (fwd+bwd, B=1, H=8, d=64, bf16, causal; peak above inputs):
+  seq=4096 (one L x L bf16 score table for 8 heads = 256 MB)
+    Naive (PyTorch math)           2088.0 MB   O(N²)
+    FlashTile triton                 28.3 MB   O(N)
+    FlashTile tiled                  85.5 MB   O(N)
+  seq=8192 (one L x L bf16 score table for 8 heads = 1024 MB)
+    Naive (PyTorch math)           8272.0 MB   O(N²)
+    FlashTile triton                 56.5 MB   O(N)
+    FlashTile tiled                 125.9 MB   O(N)
+
+Autotuner choices in this process (key = LQ bucket, LK bucket, group, d, dv, causal, dtypes):
+  fwd       (512, 512, 4, 64, 64, True, 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32')  ->  BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None
+  fwd       (4096, 4096, 1, 64, 64, True, 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32')  ->  BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None
+  fwd       (8192, 8192, 1, 64, 64, True, 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32')  ->  BLOCK_M: 128, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None
+  bwd_dkdv  (512, 512, 4, 64, 64, True, False, 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32', 'torch.float32', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32')  ->  BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  bwd_dkdv  (4096, 4096, 1, 64, 64, True, False, 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32', 'torch.float32', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32')  ->  BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  bwd_dkdv  (8192, 8192, 1, 64, 64, True, False, 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32', 'torch.float32', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32')  ->  BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  bwd_dq    (512, 512, 4, 64, 64, True, 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32', 'torch.float32', 'torch.bfloat16')  ->  BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  bwd_dq    (4096, 4096, 1, 64, 64, True, 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32', 'torch.float32', 'torch.bfloat16')  ->  BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  bwd_dq    (8192, 8192, 1, 64, 64, True, 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32', 'torch.float32', 'torch.bfloat16')  ->  BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+
+Saved to /tmp/out/validation/validation_results.json

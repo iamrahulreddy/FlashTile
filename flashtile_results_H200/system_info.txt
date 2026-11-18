@@ -1,0 +1,152 @@
+FlashTile run on NVIDIA H200
+{
+  "date_utc": "2026-11-17 15:47:14",
+  "gpu": "NVIDIA H200",
+  "compute_capability": "sm_90",
+  "gpu_memory_gib": 139.8,
+  "sm_count": 132,
+  "python": "3.12.10",
+  "torch": "2.15.0+cu132",
+  "cuda_runtime": "13.2",
+  "cudnn": 92600,
+  "triton": "3.9.0",
+  "provider": "Modal",
+  "quick": false
+}
+
+$ nvidia-smi
+Tue Nov 17 15:47:15 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 610.57.04              KMD Version: 610.57.04     CUDA UMD Version: 13.3     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA H200                    On  |   00000002:00:00.0 Off |                    0 |
+| N/A   32C    P0             80W /  700W |       4MiB / 143771MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+
+$ nvidia-smi --query-gpu=name,pci.bus_id,driver_version,memory.total,clocks.max.sm,clocks.max.mem,power.limit,temperature.gpu --format=csv
+name, pci.bus_id, driver_version, memory.total [MiB], clocks.max.sm [MHz], clocks.max.memory [MHz], power.limit [W], temperature.gpu
+NVIDIA H200, [Unknown Error], 610.57.04, 143771 MiB, 1980 MHz, 3201 MHz, 700.00 W, 32
+
+$ nvidia-smi -q -d CLOCK,PERFORMANCE,POWER | head -80
+
+==============NVSMI LOG==============
+
+Timestamp                                              : Tue Nov 17 15:47:15 2026
+Driver Version                                         : 610.57.04 [Deprecated; will be removed in CUDA 14.0. Use KMD Version instead]
+CUDA Version                                           : 13.3 [Deprecated; will be removed in CUDA 14.0. Use CUDA UMD Version instead]
+KMD Version                                            : 610.57.04
+CUDA UMD Version                                       : 13.3
+
+Attached GPUs                                          : 1
+GPU 00000002:00:00.0
+    Performance State                                  : P0
+    Clocks Event Reasons
+        Idle                                           : Active
+        Applications Clocks Setting                    : Not Active
+        SW Power Cap                                   : Not Active
+        HW Slowdown                                    : Not Active
+            HW Thermal Slowdown                        : Not Active
+            HW Power Brake Slowdown                    : Not Active
+        Sync Boost                                     : Not Active
+        SW Thermal Slowdown                            : Not Active
+        Display Clock Setting                          : Not Active
+    Clocks Event Reasons Counters
+        SW Power Capping                               : 7755705419 us
+        Sync Boost                                     : 0 us
+        SW Thermal Slowdown                            : 0 us
+        HW Thermal Slowdown                            : 0 us
+        HW Power Braking                               : 0 us
+    Sparse Operation Mode                              : Disabled
+    GPU Power Readings
+        Average Power Draw                             : 80.72 W
+        Instantaneous Power Draw                       : 80.97 W
+        GPU Ceiling Power Limit
+            Current Power Limit                        : 700.00 W
+            Requested Power Limit                      : 700.00 W
+            Default Power Limit                        : 700.00 W
+        GPU Base Power
+            Current Base Power                         : N/A
+            Requested Base Power                       : N/A
+            Default Base Power                         : N/A
+        Min Power Limit                                : 200.00 W
+        Max Power Limit                                : 700.00 W
+    Power Samples
+        Duration                                       : 2.36 sec
+        Number of Samples                              : 119
+        Max                                            : 81.30 W
+        Min                                            : 80.31 W
+        Avg                                            : 80.73 W
+    GPU Memory Power Readings 
+        Average Power Draw                             : 46.96 W
+        Instantaneous Power Draw                       : N/A
+    Module Power Readings
+        Average Power Draw                             : N/A
+        Instantaneous Power Draw                       : N/A
+        Current Power Limit                            : N/A
+        Requested Power Limit                          : N/A
+        Default Power Limit                            : N/A
+        Min Power Limit                                : N/A
+        Max Power Limit                                : N/A
+    EDPp Multiplier                                    : 100.00%
+    Clocks
+        Graphics                                       : 345 MHz
+        SM                                             : 345 MHz
+        Memory                                         : 3201 MHz
+        Video                                          : 765 MHz
+    Applications Clocks
+        Graphics                                       : Requested functionality has been deprecated
+        Memory                                         : Requested functionality has been deprecated
+    Default Applications Clocks
+        Graphics                                       : Requested functionality has been deprecated
+        Memory                                         : Requested functionality has been deprecated
+    Deferred Clocks
+        Memory                                         : N/A
+    Max Clocks
+        Graphics                                       : 1980 MHz
+        SM                                             : 1980 MHz
+        Memory                                         : 3201 MHz
+        Video                                          : 1545 MHz
+    Max Customer Boost Clocks
+        Graphics                                       : 1980 MHz
+
+$ lscpu | head -20
+Architecture:        x86_64
+CPU op-mode(s):      32-bit, 64-bit
+Address sizes:       46 bits physical, 48 bits virtual
+Byte Order:          Little Endian
+CPU(s):              17
+On-line CPU(s) list: 0-16
+Vendor ID:           GenuineIntel
+Model name:          unknown
+CPU family:          6
+Model:               143
+Thread(s) per core:  1
+Core(s) per socket:  17
+Socket(s):           1
+Stepping:            unknown
+BogoMIPS:            2901.02
+Flags:               fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 avx512vbmi umip waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid cldemote movdiri movdir64b fsrm serialize ibt avx512_fp16 arch_capabilities
+Hypervisor vendor:   Microsoft
+Virtualization type: full
+NUMA node(s):        1
+NUMA node0 CPU(s):   0-16
+
+$ free -g
+/bin/sh: 1: free: not found
+
+$ uname -a
+Linux modal 4.19.0-gvisor #1 SMP Sun Jan 10 15:06:54 PST 2016 x86_64 GNU/Linux
+

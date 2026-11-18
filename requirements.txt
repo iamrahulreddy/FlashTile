@@ -1,6 +1,8 @@
-﻿# Core Dependencies
-torch>=2.0.0
-numpy>=1.24.0
+# Core dependency (the fused GPU kernels use the Triton that ships with torch on Linux)
+torch>=2.4
 
-# Optional: GPU Kernel Development
-# triton>=2.1.0  # Required only for TritonFlashAttention
+# Optional, see pyproject.toml extras:
+#   pip install -e ".[hf]"     Hugging Face transformers integration
+#   pip install -e ".[bench]"  kernel benchmark plots
+#   pip install -e ".[llm]"    Qwen3.5-4B evaluation
+#   pip install -e ".[dev]"    tests

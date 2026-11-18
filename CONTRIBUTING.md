@@ -5,9 +5,9 @@ Contributions are welcome! This document outlines the process for contributing c
 ## Development Setup
 
 ### Prerequisites
-- Python 3.9+
-- PyTorch 2.0+
-- CUDA-capable GPU (recommended for testing)
+- Python 3.10+
+- PyTorch 2.4+ (tested on 2.15 with Triton 3.9)
+- An NVIDIA GPU for the Triton path; everything else runs on CPU
 
 ### Getting Started
 
@@ -26,96 +26,72 @@ Contributions are welcome! This document outlines the process for contributing c
 
 3. **Install in development mode:**
    ```bash
-   pip install -e ".[all]"
+   pip install -e ".[dev,hf]"
    ```
 
 4. **Verify installation:**
    ```bash
-   python -c "from flashtile import FlashAttentionV2; print('OK')"
+   python -c "import flashtile; print(flashtile.__version__)"
    ```
 
-## Code Style
+## How the code fits together
 
-### Python Guidelines
-- Follow PEP 8
-- Use type hints for function signatures
-- Write docstrings for public functions (Google style)
-- Maximum line length: 100 characters
-
-### Naming Conventions
-- Variables: `lowercase_with_underscores`
-- Classes: `PascalCase`
-- Constants: `UPPERCASE_WITH_UNDERSCORES`
+`flashtile/contract.py` decides what attention computes (shapes, GQA mapping, causal positions,
+fully masked rows). `reference.py`, `tiled.py` and `triton_kernels.py` all have to agree with it.
+If you change one of them, add a test that compares it with the fp64 reference: output, lse and
+all three gradients.
 
 ## Testing
 
-FlashTile uses pytest for testing. Run the full test suite:
+```bash
+# CPU: oracle, tiled path, gradients, gradcheck, contract errors
+pytest -v
+
+# One file
+pytest tests/test_attention.py -v
+```
+
+GPU tests (`tests/test_cuda.py`, `test_triton.py`, `test_hf.py`) skip themselves without CUDA. Run
+them on a real GPU, locally with `pytest` or on Modal:
 
 ```bash
-# Run all tests
-pytest tests/ -v
-
-# Run specific test file
-pytest tests/test_correctness.py -v
-
-# Run correctness tests only (CPU-friendly)
-pytest tests/test_correctness.py -v -m "not gpu"
-
-# Run with coverage
-pytest tests/ --cov=flashtile --cov-report=html
+modal run modal_app.py --gpus H200 --skip-bench --skip-llm
+modal run modal_app.py --gpus H200 --skip-bench --skip-llm --pytest-args "tests/test_triton.py -k decode"
 ```
 
 ### Pre-Submission Checklist
 
-Before submitting changes:
-
 ```bash
-# 1. Verify imports work
-python -c "from flashtile import NaiveAttention, FlashAttentionV1, FlashAttentionV2"
+# 1. Imports and backend selection
+python -c "import flashtile, torch; q = torch.randn(1, 2, 8, 4); print(flashtile.select_backend(q, q, q))"
 
-# 2. Run correctness tests
-pytest tests/test_correctness.py -v
+# 2. CPU suite
+pytest -v
 
-# 3. Run integration tests
-pytest tests/test_integration.py -v
-
-# 4. Quick sanity check (if you have GPU)
-python -c "
-import torch
-from flashtile import NaiveAttention, FlashAttentionV1
-x = torch.randn(1, 128, 512)
-naive = NaiveAttention(512, 8)
-flash = FlashAttentionV1(512, 8)
-diff = (naive(x)[0] - flash(x)[0]).abs().max()
-assert diff < 0.01, f'Error too large: {diff}'
-print('Correctness test passed!')
-"
+# 3. GPU suite (if you changed anything under flashtile/)
+modal run modal_app.py --gpus H200 --skip-bench --skip-llm
 ```
+
+For a performance change, also run the benchmark on the GPUs you claim it for:
+`modal run modal_app.py --gpus H200 --skip-tests --skip-llm`. Mention the rows that got slower too.
 
 ## Project Structure
 
 ```
 flashtile/
-├── attention/          # Attention implementations
-│   ├── base_attention.py
-│   ├── naive_attention.py
-│   ├── flash_attention_v1.py
-│   ├── flash_attention_v2.py
-│   ├── grouped_query_attention.py
-│   ├── sliding_window_attention.py
-│   └── masked_attention.py
-├── kernels/            # GPU kernels
-│   └── triton_flash_kernel.py
-├── utils/              # Utilities
-│   ├── memory_profiler.py
-│   ├── kernel_profiler.py
-│   ├── attention_visualizer.py
-│   └── visualization.py
-└── __init__.py         # Public API
+├── contract.py         # input validation and the operation contract
+├── reference.py        # dense fp64-capable oracle
+├── tiled.py            # tiled PyTorch forward/backward (any device, dtype, mask)
+├── triton_kernels.py   # fused Triton forward/backward
+├── api.py              # attention(), backend selection
+├── hf.py               # Hugging Face transformers integration
+└── __init__.py         # public API
 
-tests/                  # Test suite
-benchmark/              # Benchmarking tools
-demo/                   # Interactive demos
+tests/                  # CPU and GPU test suites
+benchmark/              # kernel benchmark, validation, Qwen3.5 evaluation, Qwen3.8-27B comparison, reports
+docs/                   # USAGE.md, PERFORMANCE.md and the cross-GPU dashboard
+flashtile_results_*/    # published results, one folder per GPU
+modal_app.py            # runs everything on Modal GPUs
 ```
 
 ## Pull Request Process
@@ -131,34 +107,11 @@ demo/                   # Interactive demos
 
 When reporting bugs, please include:
 - Python version (`python --version`)
-- PyTorch version (`python -c "import torch; print(torch.__version__)"`)
+- PyTorch and Triton versions (`python -c "import torch, triton; print(torch.__version__, triton.__version__)"`)
 - GPU model (if applicable): `nvidia-smi`
+- The backend that ran: `flashtile.select_backend(q, k, v, ...)`
 - Minimal code to reproduce the issue
 - Full error traceback
-- FlashTile version (`python -c "from flashtile import __version__; print(__version__)"`)
-
-## Development Tips
-
-### Adding New Attention Variants
-
-1. Create new file in `flashtile/attention/`
-2. Inherit from `BaseAttention`
-3. Implement `forward()` and `get_memory_usage()`
-4. Add to `flashtile/__init__.py` exports
-5. Add tests in `tests/`
-6. Update documentation
-
-### Code Quality Tools
-
-```bash
-# Format code
-black flashtile/ tests/
-
-# Sort imports
-isort flashtile/ tests/
-
-# Type checking (optional)
-mypy flashtile/
-```
+- FlashTile version (`python -c "import flashtile; print(flashtile.__version__)"`)
 
 Thank you for contributing!

@@ -1,0 +1,461 @@
+==============================================================================================================
+FlashTile attention benchmark   2026-11-17 15:10:23 UTC
+GPU NVIDIA RTX PRO 6000 Blackwell Server Edition  sm_120  95 GiB  188 SMs
+torch 2.15.0+cu132  CUDA 13.2  cuDNN 92600  triton 3.9.0
+dtype torch.bfloat16  tokens per row 16384 (batch = 16384 / L)
+Timing: CUDA events around back-to-back calls, each sample >= 2.0 ms, >= 20 samples and >= 400 ms total, 3 warmup calls. Reported per call: median, p10, p90.
+Parity: fp32 dense oracle on batch 0 / KV head 0 group; forward always, gradients for L <= 4096. Tolerance fwd 0.02 abs, grads 0.1 relative to max |grad|.
+naive = PyTorch SDPA MATH backend (materialises the full L x L score table).
+==============================================================================================================
+
+--- workload mha-d128  Hq=16 Hkv=16 d=128  causal=True  mode=fwd ---
+     L   B  backend           status        median ms       p10       p90    n reps  TFLOP/s   peak MiB   fwd err  grad err
+   512  32  flashtile-triton  ok                0.243     0.242     0.243  236    7    141.7       65.0  4.70e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+   512  32  sdpa-flash        ok                0.202     0.202     0.203  220    9    170.1       65.0  4.70e-03 -
+   512  32  sdpa-cudnn        ok                0.195     0.195     0.196  228    9    176.2       64.0  4.70e-03 -
+   512  32  sdpa-efficient    ok                0.409     0.408     0.409  196    5     84.3       64.0  4.70e-03 -
+   512  32  naive             ok                5.526     5.519     5.531   73    1      6.2     1665.3  3.90e-03 -
+  1024  16  flashtile-triton  ok                0.315     0.314     0.315  212    6    218.6       65.0  7.25e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  1024  16  sdpa-flash        ok                0.302     0.302     0.303  190    7    227.5       65.0  7.25e-03 -
+  1024  16  sdpa-cudnn        ok                0.285     0.285     0.285  201    7    241.4       64.0  7.25e-03 -
+  1024  16  sdpa-efficient    ok                0.673     0.673     0.674  198    3    102.2       64.0  7.25e-03 -
+  1024  16  naive             ok                9.941     9.934     9.949   41    1      6.9     2820.3  7.25e-03 -
+  2048   8  flashtile-triton  ok                0.471     0.467     0.473  213    4    292.0       65.0  7.77e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  2048   8  sdpa-flash        ok                0.518     0.517     0.526  193    4    265.5       65.0  7.77e-03 -
+  2048   8  sdpa-cudnn        ok                0.491     0.490     0.492  204    4    280.0       64.0  7.77e-03 -
+  2048   8  sdpa-efficient    ok                1.198     1.197     1.199  167    2    114.8       64.0  7.77e-03 -
+  2048   8  naive             ok               18.762    18.753    18.778   22    1      7.3     5136.3  7.77e-03 -
+  4096   4  flashtile-triton  ok                0.851     0.840     0.852  158    3    323.2       65.0  5.14e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  4096   4  sdpa-flash        ok                0.945     0.942     0.961  141    3    291.0       65.0  5.14e-03 -
+  4096   4  sdpa-cudnn        ok                0.898     0.889     0.903  149    3    306.1       64.0  5.14e-03 -
+  4096   4  sdpa-efficient    ok                2.254     2.252     2.256  178    1    122.0       64.0  5.14e-03 -
+  4096   4  naive             ok               39.787    39.765    39.804   20    1      6.9     9792.3  5.14e-03 -
+  8192   2  flashtile-triton  ok                1.633     1.595     1.637  124    2    336.7       65.0  8.53e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None
+  8192   2  sdpa-flash        ok                1.804     1.799     1.811  111    2    304.9       65.0  8.53e-03 -
+  8192   2  sdpa-cudnn        ok                1.710     1.675     1.716  118    2    321.6       64.0  8.53e-03 -
+  8192   2  sdpa-efficient    ok                4.342     4.340     4.344   93    1    126.6       64.0  8.53e-03 -
+  8192   2  naive             ok               76.762    76.681    76.781   20    1      7.2    19200.3  7.10e-03 -
+ 16384   1  flashtile-triton  ok                3.169     3.152     3.181  127    1    347.0       65.0  6.38e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None
+ 16384   1  sdpa-flash        ok                3.495     3.492     3.503  115    1    314.6       65.0  6.38e-03 -
+ 16384   1  sdpa-cudnn        ok                3.329     3.235     3.344  121    1    330.3       64.0  6.38e-03 -
+ 16384   1  sdpa-efficient    ok                8.503     8.497     8.508   48    1    129.3       64.0  6.38e-03 -
+ 16384   1  naive             ok              156.742   156.715   156.794   20    1      7.0    38400.3  6.38e-03 -
+
+--- workload mha-d128  Hq=16 Hkv=16 d=128  causal=True  mode=fwd+bwd ---
+     L   B  backend           status        median ms       p10       p90    n reps  TFLOP/s   peak MiB   fwd err  grad err
+   512  32  flashtile-triton  ok                1.090     1.088     1.092  156    2    110.5      258.0  4.70e-03  2.96e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+   512  32  flashtile-atomic  ok                1.871     1.869     1.876  107    2     64.4      386.0  4.70e-03  2.96e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+   512  32  sdpa-flash        ok                1.214     1.212     1.217  165    2     99.2      514.0  4.70e-03  2.96e-03
+   512  32  sdpa-cudnn        ok                1.216     1.213     1.220  165    2     99.1      515.0  4.70e-03  4.86e-03
+   512  32  sdpa-efficient    ok                2.072     1.967     2.083  195    1     58.2      482.1  4.70e-03  3.23e-03
+   512  32  naive             ok               10.984    10.976    10.991   37    1     11.0     2496.0  3.90e-03  2.96e-03
+  1024  16  flashtile-triton  ok                1.493     1.491     1.496  134    2    161.2      258.0  7.25e-03  3.72e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  1024  16  flashtile-atomic  ok                2.828     2.823     2.836  142    1     85.1      386.0  7.25e-03  3.72e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  1024  16  sdpa-flash        ok                1.443     1.440     1.447  139    2    166.9      514.0  7.25e-03  3.72e-03
+  1024  16  sdpa-cudnn        ok                1.534     1.531     1.539  131    2    156.9      515.0  7.25e-03  3.72e-03
+  1024  16  sdpa-efficient    ok                3.509     3.503     3.516  114    1     68.6      466.1  7.25e-03  4.12e-03
+  1024  16  naive             ok               19.415    19.406    19.460   21    1     12.4     4544.0  7.25e-03  2.08e-03
+  2048   8  flashtile-triton  ok                2.456     2.443     2.465  163    1    195.9      258.0  7.77e-03  4.49e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  2048   8  flashtile-atomic  ok                3.727     3.721     3.735  108    1    129.1      386.0  7.77e-03  4.49e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  2048   8  sdpa-flash        ok                2.162     2.159     2.166  185    1    222.6      514.0  7.77e-03  4.49e-03
+  2048   8  sdpa-cudnn        ok                2.332     2.327     2.344  172    1    206.4      515.0  7.77e-03  4.21e-03
+  2048   8  sdpa-efficient    ok                8.614     8.597     8.657   47    1     55.9      458.1  7.77e-03  4.21e-03
+  2048   8  naive             ok               36.544    36.523    36.580   20    1     13.2     8640.0  7.77e-03  3.04e-03
+  4096   4  flashtile-triton  ok                4.478     4.433     4.497   90    1    214.9      258.0  5.14e-03  4.34e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  4096   4  flashtile-atomic  ok                5.186     5.171     5.213   78    1    185.6      322.0  5.14e-03  4.34e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  4096   4  sdpa-flash        ok                3.633     3.595     3.644  111    1    264.9      514.0  5.14e-03  4.34e-03
+  4096   4  sdpa-cudnn        ok                3.926     3.920     3.933  102    1    245.1      515.0  5.14e-03  3.97e-03
+  4096   4  sdpa-efficient    ok               15.399    15.379    15.449   26    1     62.5      462.1  5.14e-03  4.72e-03
+  4096   4  naive             ok               74.903    74.853    74.983   20    1     12.8    16832.0  5.14e-03  2.53e-03
+  8192   2  flashtile-triton  ok                8.470     8.421     8.483   48    1    227.2      258.0  8.53e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  8192   2  flashtile-atomic  ok                9.216     9.184     9.232   44    1    208.8      386.0  8.53e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  8192   2  sdpa-flash        ok                6.593     6.554     6.609   61    1    291.9      514.0  8.53e-03 -
+  8192   2  sdpa-cudnn        ok                7.057     7.028     7.116   57    1    272.7      515.0  8.53e-03 -
+  8192   2  sdpa-efficient    ok               29.049    28.986    29.072   20    1     66.2      462.1  8.53e-03 -
+  8192   2  naive             ok              144.060   143.960   144.145   20    1     13.4    33216.0  7.10e-03 -
+ 16384   1  flashtile-triton  ok               16.650    16.556    16.676   25    1    231.1      258.0  6.38e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+ 16384   1  flashtile-atomic  ok               17.277    17.262    17.289   24    1    222.8      386.0  6.38e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+ 16384   1  sdpa-flash        ok               12.375    12.124    12.399   33    1    311.0      514.0  6.38e-03 -
+ 16384   1  sdpa-cudnn        ok               13.346    13.170    13.493   30    1    288.4      514.0  6.38e-03 -
+ 16384   1  sdpa-efficient    ok               56.881    56.839    56.917   20    1     67.7      462.1  6.38e-03 -
+ 16384   1  naive             ok              297.139   297.019   297.354   20    1     13.0    65984.0  6.38e-03 -
+
+--- workload mha-d128  Hq=16 Hkv=16 d=128  causal=False  mode=fwd ---
+     L   B  backend           status        median ms       p10       p90    n reps  TFLOP/s   peak MiB   fwd err  grad err
+   512  32  flashtile-triton  ok                0.410     0.409     0.412  196    5    167.7       65.0  1.22e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+   512  32  sdpa-flash        ok                0.280     0.279     0.280  205    7    245.8       65.0  1.03e-03 -
+   512  32  sdpa-cudnn        ok                0.252     0.249     0.255  199    8    272.4       64.0  1.16e-03 -
+   512  32  sdpa-efficient    ok                0.604     0.603     0.605  166    4    113.8       64.0  1.16e-03 -
+   512  32  naive             ok                4.786     4.782     4.790   84    1     14.4     1664.3  9.46e-04 -
+  1024  16  flashtile-triton  ok                0.528     0.527     0.529  190    4    260.2       65.0  9.18e-04 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None
+  1024  16  sdpa-flash        ok                0.470     0.466     0.472  171    5    292.7       65.0  9.18e-04 -
+  1024  16  sdpa-cudnn        ok                0.437     0.427     0.441  184    5    314.2       64.0  9.18e-04 -
+  1024  16  sdpa-efficient    ok                1.118     1.117     1.120  179    2    122.9       64.0  9.18e-04 -
+  1024  16  naive             ok                8.483     8.477     8.491   48    1     16.2     2816.3  9.18e-04 -
+  2048   8  flashtile-triton  ok                0.886     0.878     0.887  151    3    310.4       65.0  5.51e-04 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  2048   8  sdpa-flash        ok                0.874     0.870     0.875  153    3    314.6       65.0  7.22e-04 -
+  2048   8  sdpa-cudnn        ok                0.816     0.785     0.820  165    3    336.7       64.0  5.51e-04 -
+  2048   8  sdpa-efficient    ok                2.152     2.150     2.155  186    1    127.7       64.0  5.93e-04 -
+  2048   8  naive             ok               15.870    15.860    15.880   26    1     17.3     5120.3  4.86e-04 -
+  4096   4  flashtile-triton  ok                1.676     1.669     1.678  120    2    328.1       65.0  4.86e-04 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None
+  4096   4  sdpa-flash        ok                1.675     1.648     1.679  120    2    328.2       65.0  4.86e-04 -
+  4096   4  sdpa-cudnn        ok                1.595     1.518     1.602  127    2    344.7       64.0  4.86e-04 -
+  4096   4  sdpa-efficient    ok                4.192     4.189     4.197   96    1    131.1       64.0  4.86e-04 -
+  4096   4  naive             ok               31.292    31.279    31.314   20    1     17.6     9728.3  4.86e-04 -
+  8192   2  flashtile-triton  ok                3.228     3.218     3.236  124    1    340.6       65.0  3.08e-04 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None
+  8192   2  sdpa-flash        ok                3.287     3.276     3.311  122    1    334.5       65.0  3.16e-04 -
+  8192   2  sdpa-cudnn        ok                3.139     2.978     3.152  129    1    350.3       64.0  3.08e-04 -
+  8192   2  sdpa-efficient    ok                8.201     8.193     8.211   49    1    134.1       64.0  2.94e-04 -
+  8192   2  naive             ok               59.252    59.232    59.273   20    1     18.6    18944.3  2.43e-04 -
+ 16384   1  flashtile-triton  ok                6.309     6.166     6.324   64    1    348.5       65.0  2.17e-04 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None
+ 16384   1  sdpa-flash        ok                6.532     6.327     6.549   62    1    336.7       65.0  2.74e-04 -
+ 16384   1  sdpa-cudnn        ok                6.217     5.874     6.241   66    1    353.7       64.0  2.17e-04 -
+ 16384   1  sdpa-efficient    ok               16.156    16.150    16.162   25    1    136.1       64.0  2.17e-04 -
+ 16384   1  naive             ok              121.053   121.026   121.284   20    1     18.2    37376.3  2.17e-04 -
+
+--- workload mha-d128  Hq=16 Hkv=16 d=128  causal=False  mode=fwd+bwd ---
+     L   B  backend           status        median ms       p10       p90    n reps  TFLOP/s   peak MiB   fwd err  grad err
+   512  32  flashtile-triton  ok                1.851     1.848     1.855  108    2    129.9      258.0  1.22e-03  3.58e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+   512  32  flashtile-atomic  ok                3.167     3.161     3.173  127    1     76.0      386.0  1.22e-03  3.58e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+   512  32  sdpa-flash        ok                1.420     1.416     1.424  141    2    169.4      514.0  1.03e-03  3.85e-03
+   512  32  sdpa-cudnn        ok                1.453     1.450     1.457  138    2    165.5      514.0  1.16e-03  3.71e-03
+   512  32  sdpa-efficient    ok                3.305     3.292     3.491  119    1     72.8      482.1  1.16e-03  6.34e-03
+   512  32  naive             ok               10.258    10.254    10.267   39    1     23.4     2496.0  9.46e-04  2.06e-03
+  1024  16  flashtile-triton  ok                2.702     2.698     2.707  148    1    178.0      258.0  9.18e-04  5.08e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  1024  16  flashtile-atomic  ok                5.529     5.520     5.558   73    1     87.0      386.0  9.18e-04  5.08e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  1024  16  sdpa-flash        ok                2.075     2.067     2.083  193    1    231.9      514.0  9.18e-04  5.08e-03
+  1024  16  sdpa-cudnn        ok                2.154     2.145     2.164  186    1    223.3      514.0  9.18e-04  5.08e-03
+  1024  16  sdpa-efficient    ok                6.475     6.464     6.524   62    1     74.3      466.1  9.18e-04  5.30e-03
+  1024  16  naive             ok               18.111    18.093    18.185   23    1     26.6     4544.0  9.18e-04  3.20e-03
+  2048   8  flashtile-triton  ok                4.762     4.748     4.793   84    1    202.0      258.0  5.51e-04  3.66e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  2048   8  flashtile-atomic  ok                7.435     7.426     7.469   54    1    129.4      386.0  5.51e-04  3.66e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  2048   8  sdpa-flash        ok                3.454     3.399     3.475  117    1    278.6      514.0  7.22e-04  3.66e-03
+  2048   8  sdpa-cudnn        ok                3.574     3.525     3.594  113    1    269.2      515.0  5.51e-04  4.24e-03
+  2048   8  sdpa-efficient    ok               16.631    16.608    16.650   25    1     57.8      458.1  5.93e-04  4.37e-03
+  2048   8  naive             ok               33.904    33.883    33.955   20    1     28.4     8640.0  4.86e-04  2.45e-03
+  4096   4  flashtile-triton  ok                8.878     8.809     8.959   46    1    216.7      258.0  4.86e-04  3.70e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  4096   4  flashtile-atomic  ok                9.775     9.739     9.867   41    1    196.9      386.0  4.86e-04  3.70e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  4096   4  sdpa-flash        ok                6.265     6.068     6.315   65    1    307.1      514.0  4.86e-04  3.70e-03
+  4096   4  sdpa-cudnn        ok                6.558     6.370     6.582   62    1    293.4      514.0  4.86e-04  4.11e-03
+  4096   4  sdpa-efficient    ok               30.393    30.321    30.458   20    1     63.3      462.1  4.86e-04  4.74e-03
+  4096   4  naive             ok               66.953    66.902    66.973   20    1     28.7    16832.0  4.86e-04  2.81e-03
+  8192   2  flashtile-triton  ok               17.028    16.934    17.115   24    1    226.0      258.0  3.08e-04 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  8192   2  flashtile-atomic  ok               17.998    17.840    18.083   23    1    213.8      386.0  3.08e-04 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  8192   2  sdpa-flash        ok               11.989    11.728    12.094   34    1    321.0      514.0  3.16e-04 -
+  8192   2  sdpa-cudnn        ok               12.531    12.201    12.648   33    1    307.1      514.0  3.08e-04 -
+  8192   2  sdpa-efficient    ok               57.648    57.551    57.790   20    1     66.8      462.1  2.94e-04 -
+  8192   2  naive             ok              127.550   127.520   127.623   20    1     30.2    33216.0  2.43e-04 -
+ 16384   1  flashtile-triton  ok               33.377    33.298    33.439   20    1    230.6      258.0  2.17e-04 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+ 16384   1  flashtile-atomic  ok               34.733    34.688    34.840   20    1    221.6      386.0  2.17e-04 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 64, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+ 16384   1  sdpa-flash        ok               23.388    23.246    23.420   20    1    329.1      514.0  2.74e-04 -
+ 16384   1  sdpa-cudnn        ok               24.349    24.151    24.374   20    1    316.1      515.0  2.17e-04 -
+ 16384   1  sdpa-efficient    ok              114.745   114.634   114.831   20    1     67.1      462.1  2.17e-04 -
+ 16384   1  naive             ok              263.287   263.210   263.546   20    1     29.2    65984.0  2.17e-04 -
+
+--- workload mha-d64  Hq=32 Hkv=32 d=64  causal=True  mode=fwd ---
+     L   B  backend           status        median ms       p10       p90    n reps  TFLOP/s   peak MiB   fwd err  grad err
+   512  32  flashtile-triton  ok                0.226     0.226     0.227  221    8    152.2       66.0  4.32e-03 -
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+   512  32  sdpa-flash        ok                0.199     0.198     0.199  224    9    173.4       66.0  4.32e-03 -
+   512  32  sdpa-cudnn        ok                0.229     0.228     0.229  219    8    150.5       64.0  4.32e-03 -
+   512  32  sdpa-efficient    ok                0.336     0.333     0.338  199    6    102.4       64.0  4.32e-03 -
+   512  32  naive             ok                9.425     9.417     9.447   43    1      3.7     2817.5  3.86e-03 -
+  1024  16  flashtile-triton  ok                0.313     0.310     0.314  214    6    219.8       66.0  4.74e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  1024  16  sdpa-flash        ok                0.274     0.273     0.275  209    7    251.2       66.0  4.74e-03 -
+  1024  16  sdpa-cudnn        ok                0.336     0.336     0.337  199    6    204.4       64.0  4.74e-03 -
+  1024  16  sdpa-efficient    ok                0.558     0.553     0.562  180    4    123.3       64.0  4.74e-03 -
+  1024  16  naive             ok               17.563    17.535    17.612   23    1      3.9     5124.5  4.07e-03 -
+  2048   8  flashtile-triton  ok                0.492     0.486     0.494  204    4    279.5       66.0  4.32e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None
+  2048   8  sdpa-flash        ok                0.481     0.478     0.484  208    4    286.0       66.0  4.32e-03 -
+  2048   8  sdpa-cudnn        ok                0.510     0.505     0.513  197    4    269.4       64.0  4.32e-03 -
+  2048   8  sdpa-efficient    ok                1.003     0.999     1.011  200    2    137.1       64.0  4.32e-03 -
+  2048   8  naive             ok               34.398    34.381    34.413   20    1      4.0     9744.5  3.78e-03 -
+  4096   4  flashtile-triton  ok                0.960     0.912     0.967  141    3    286.4       66.0  6.65e-03 -
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None
+  4096   4  sdpa-flash        ok                0.886     0.880     0.893  151    3    310.3       66.0  6.65e-03 -
+  4096   4  sdpa-cudnn        ok                0.938     0.912     0.941  144    3    293.2       64.0  6.65e-03 -
+  4096   4  sdpa-efficient    ok                1.888     1.877     1.898  106    2    145.6       64.0  6.65e-03 -
+  4096   4  naive             ok               72.805    72.755    72.893   20    1      3.8    19008.5  6.65e-03 -
+  8192   2  flashtile-triton  ok                1.817     1.712     1.828  112    2    302.7       66.0  5.79e-03 -
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None
+  8192   2  sdpa-flash        ok                1.699     1.684     1.712  118    2    323.7       66.0  5.79e-03 -
+  8192   2  sdpa-cudnn        ok                1.781     1.715     1.787  114    2    308.7       64.0  5.79e-03 -
+  8192   2  sdpa-efficient    ok                3.649     3.621     3.685  110    1    150.7       64.0  5.79e-03 -
+  8192   2  naive             ok              146.985   146.948   147.184   20    1      3.7    37632.5  5.79e-03 -
+ 16384   1  flashtile-triton  ok                3.159     3.044     3.187  128    1    348.1       66.0  3.85e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None
+ 16384   1  sdpa-flash        ok                3.315     3.215     3.354  122    1    331.7       66.0  3.85e-03 -
+ 16384   1  sdpa-cudnn        ok                3.460     3.314     3.475  117    1    317.8       64.0  3.85e-03 -
+ 16384   1  sdpa-efficient    ok                7.180     6.995     7.236   56    1    153.2       64.0  3.85e-03 -
+ 16384   1  naive             ok              332.501   332.378   332.575   20    1      3.3    75264.5  3.85e-03 -
+
+--- workload mha-d64  Hq=32 Hkv=32 d=64  causal=True  mode=fwd+bwd ---
+     L   B  backend           status        median ms       p10       p90    n reps  TFLOP/s   peak MiB   fwd err  grad err
+   512  32  flashtile-triton  ok                1.035     1.034     1.037  194    2    116.4      260.0  4.32e-03  2.86e-03
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+   512  32  flashtile-atomic  ok                1.413     1.411     1.418  142    2     85.3      388.0  4.32e-03  2.86e-03
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 128, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+   512  32  sdpa-flash        ok                1.202     1.200     1.205  167    2    100.2      516.0  4.32e-03  2.86e-03
+   512  32  sdpa-cudnn        ok                1.222     1.220     1.226  164    2     98.6      516.0  4.32e-03  2.86e-03
+   512  32  sdpa-efficient    ok                1.600     1.598     1.604  125    2     75.3      452.1  4.32e-03  3.62e-03
+   512  32  naive             ok               18.347    18.337    18.383   22    1      6.6     4544.0  3.86e-03  2.29e-03
+  1024  16  flashtile-triton  ok                1.344     1.337     1.348  149    2    179.1      260.0  4.74e-03  2.89e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  1024  16  flashtile-atomic  ok                1.934     1.932     1.938  104    2    124.5      388.0  4.74e-03  2.89e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 128, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  1024  16  sdpa-flash        ok                1.431     1.430     1.435  140    2    168.2      516.0  4.74e-03  2.89e-03
+  1024  16  sdpa-cudnn        ok                1.630     1.628     1.632  123    2    147.7      516.0  4.74e-03  2.89e-03
+  1024  16  sdpa-efficient    ok                2.676     2.669     2.684  150    1     90.0      452.1  4.74e-03  3.81e-03
+  1024  16  naive             ok               33.769    33.753    33.782   20    1      7.1     8640.0  4.07e-03  2.89e-03
+  2048   8  flashtile-triton  ok                2.184     2.167     2.188  184    1    220.4      260.0  4.32e-03  2.91e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  2048   8  flashtile-atomic  ok                2.969     2.967     2.974  135    1    162.1      388.0  4.32e-03  2.91e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 128, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  2048   8  sdpa-flash        ok                2.133     2.128     2.138  188    1    225.6      516.0  4.32e-03  2.91e-03
+  2048   8  sdpa-cudnn        ok                2.453     2.449     2.457  164    1    196.2      516.0  4.32e-03  2.91e-03
+  2048   8  sdpa-efficient    ok                4.661     4.647     4.678   86    1    103.2      452.1  4.32e-03  2.91e-03
+  2048   8  naive             ok               65.517    65.471    65.564   20    1      7.3    16832.0  3.78e-03  2.34e-03
+  4096   4  flashtile-triton  ok                4.011     3.832     4.033  101    1    239.9      260.0  6.65e-03  3.76e-03
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  4096   4  flashtile-atomic  ok                4.566     4.556     4.578   88    1    210.7      388.0  6.65e-03  3.76e-03
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  4096   4  sdpa-flash        ok                3.579     3.568     3.602  112    1    268.8      516.0  6.65e-03  3.76e-03
+  4096   4  sdpa-cudnn        ok                4.136     4.132     4.144   97    1    232.7      516.0  6.65e-03  3.76e-03
+  4096   4  sdpa-efficient    ok                8.675     8.647     8.730   47    1    110.9      452.1  6.65e-03  3.76e-03
+  4096   4  naive             ok              133.304   133.236   133.393   20    1      7.2    33216.0  6.65e-03  2.25e-03
+  8192   2  flashtile-triton  ok                7.547     7.161     7.586   54    1    255.0      260.0  5.79e-03 -
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  8192   2  flashtile-atomic  ok                7.583     7.570     7.593   53    1    253.8      388.0  5.79e-03 -
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  8192   2  sdpa-flash        ok                6.465     6.437     6.494   62    1    297.7      516.0  5.79e-03 -
+  8192   2  sdpa-cudnn        ok                7.486     7.479     7.565   54    1    257.1      516.0  5.79e-03 -
+  8192   2  sdpa-efficient    ok               16.765    16.735    16.806   24    1    114.8      452.1  5.79e-03 -
+  8192   2  naive             ok              268.780   268.679   268.857   20    1      7.2    65984.0  5.79e-03 -
+ 16384   1  flashtile-triton  ok               14.318    14.280    14.340   28    1    268.8      260.0  3.85e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+ 16384   1  flashtile-atomic  ok               13.744    13.729    13.768   30    1    280.0      388.0  3.85e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+ 16384   1  sdpa-flash        ok               12.174    11.972    12.311   33    1    316.1      516.0  3.85e-03 -
+ 16384   1  sdpa-cudnn        ok               14.073    14.068    14.079   29    1    273.5      516.0  3.85e-03 -
+ 16384   1  sdpa-efficient    ok               33.040    32.990    33.133   20    1    116.5      452.1  3.85e-03 -
+ 16384   1  naive             oom          - - -    0    0 - -  3.85e-03 -   (CUDA out of memory. Tried to allocate 32.00 GiB. GPU 0 has a total capacity of 95.01 GiB o)
+
+--- workload gqa4-d128  Hq=32 Hkv=8 d=128  causal=True  mode=fwd ---
+     L   B  backend           status        median ms       p10       p90    n reps  TFLOP/s   peak MiB   fwd err  grad err
+   512  32  flashtile-triton  ok                0.335     0.331     0.337  200    6    205.5      130.0  7.99e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+   512  32  sdpa-flash        ok                0.346     0.345     0.346  193    6    199.3      130.0  7.99e-03 -
+   512  32  sdpa-cudnn        ok                0.328     0.325     0.330  204    6    209.6      128.0  7.99e-03 -
+   512  32  sdpa-efficient    ok                0.777     0.776     0.778  172    3     88.6      128.0  7.99e-03 -
+   512  32  naive             ok               10.965    10.957    10.974   37    1      6.3     3457.5  7.64e-03 -
+  1024  16  flashtile-triton  ok                0.521     0.516     0.523  193    4    264.1      130.0  7.41e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  1024  16  sdpa-flash        ok                0.550     0.550     0.551  182    4    249.9      130.0  7.41e-03 -
+  1024  16  sdpa-cudnn        ok                0.534     0.529     0.536  188    4    257.8      128.0  7.41e-03 -
+  1024  16  sdpa-efficient    ok                1.289     1.288     1.290  156    2    106.7      128.0  7.41e-03 -
+  1024  16  naive             ok               19.696    19.689    19.715   21    1      7.0     5764.5  7.41e-03 -
+  2048   8  flashtile-triton  ok                0.901     0.898     0.902  149    3    305.3      130.0  5.94e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  2048   8  sdpa-flash        ok                0.965     0.954     0.968  139    3    284.9      130.0  5.94e-03 -
+  2048   8  sdpa-cudnn        ok                0.929     0.912     0.935  145    3    295.9      128.0  5.94e-03 -
+  2048   8  sdpa-efficient    ok                2.315     2.314     2.318  173    1    118.8      128.0  5.94e-03 -
+  2048   8  naive             ok               37.289    37.278    37.392   20    1      7.4    10384.5  5.94e-03 -
+  4096   4  flashtile-triton  ok                1.663     1.607     1.669  122    2    330.7      130.0  8.25e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  4096   4  sdpa-flash        ok                1.786     1.761     1.795  113    2    307.9      130.0  8.25e-03 -
+  4096   4  sdpa-cudnn        ok                1.732     1.662     1.740  117    2    317.5      128.0  8.25e-03 -
+  4096   4  sdpa-efficient    ok                4.357     4.355     4.361   92    1    126.2      128.0  8.25e-03 -
+  4096   4  naive             ok               77.078    77.044    77.119   20    1      7.1    19648.5  7.71e-03 -
+  8192   2  flashtile-triton  ok                3.207     3.046     3.222  127    1    342.9      130.0  7.59e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  8192   2  sdpa-flash        ok                3.446     3.385     3.461  117    1    319.1      130.0  7.59e-03 -
+  8192   2  sdpa-cudnn        ok                3.303     3.162     3.320  123    1    333.0      128.0  7.59e-03 -
+  8192   2  sdpa-efficient    ok                8.427     8.424     8.430   48    1    130.5      128.0  7.59e-03 -
+  8192   2  naive             ok              156.257   156.225   156.380   20    1      7.0    38272.5  7.59e-03 -
+ 16384   1  flashtile-triton  ok                6.282     5.943     6.336   65    1    350.1      130.0  6.16e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+ 16384   1  sdpa-flash        ok                6.743     6.602     6.775   60    1    326.2      130.0  6.16e-03 -
+ 16384   1  sdpa-cudnn        ok                6.436     6.143     6.476   63    1    341.7      128.0  6.16e-03 -
+ 16384   1  sdpa-efficient    ok               16.550    16.544    16.578   25    1    132.9      128.0  6.16e-03 -
+ 16384   1  naive             ok              309.965   309.883   310.018   20    1      7.1    75904.5  6.16e-03 -
+
+--- workload gqa4-d128  Hq=32 Hkv=8 d=128  causal=True  mode=fwd+bwd ---
+     L   B  backend           status        median ms       p10       p90    n reps  TFLOP/s   peak MiB   fwd err  grad err
+   512  32  flashtile-triton  ok                1.894     1.892     1.900  106    2    127.2      324.0  7.99e-03  4.15e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None
+   512  32  flashtile-atomic  ok                3.481     3.473     3.494  115    1     69.2      580.0  7.99e-03  4.15e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None
+   512  32  sdpa-flash        ok                2.566     2.562     2.570  156    1     93.9     1092.0  7.99e-03  4.15e-03
+   512  32  sdpa-cudnn        ok                2.509     2.506     2.515  160    1     96.0     1092.0  7.99e-03  3.91e-03
+   512  32  sdpa-efficient    ok                3.772     3.766     3.780  106    1     63.9     1028.3  7.99e-03  4.02e-03
+   512  32  naive             ok               21.804    21.797    21.869   20    1     11.1     4992.0  7.64e-03  3.36e-03
+  1024  16  flashtile-triton  ok                2.763     2.756     2.772  145    1    174.3      324.0  7.41e-03  2.96e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  1024  16  flashtile-atomic  ok                4.423     4.419     4.435   91    1    108.9        0.0  7.41e-03  2.96e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  1024  16  sdpa-flash        ok                3.082     3.079     3.087  130    1    156.2     1092.0  7.41e-03  3.98e-03
+  1024  16  sdpa-cudnn        ok                3.230     3.226     3.237  124    1    149.1     1092.0  7.41e-03  3.98e-03
+  1024  16  sdpa-efficient    ok                7.134     7.126     7.149   57    1     67.5      996.3  7.41e-03  3.98e-03
+  1024  16  naive             ok               38.460    38.419    38.575   20    1     12.5     9088.0  7.41e-03  2.11e-03
+  2048   8  flashtile-triton  ok                4.776     4.701     4.792   84    1    201.5      324.0  5.94e-03  3.73e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  2048   8  flashtile-atomic  ok                5.690     5.683     5.696   71    1    169.2      130.0  5.94e-03  3.73e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  2048   8  sdpa-flash        ok                4.457     4.453     4.461   90    1    216.0     1092.0  5.94e-03  3.73e-03
+  2048   8  sdpa-cudnn        ok                4.739     4.735     4.745   85    1    203.1     1092.0  5.94e-03  3.96e-03
+  2048   8  sdpa-efficient    ok               13.285    13.279    13.299   31    1     72.5      980.3  5.94e-03  3.70e-03
+  2048   8  naive             ok               72.163    72.141    72.252   20    1     13.3    17280.0  5.94e-03  2.95e-03
+  4096   4  flashtile-triton  ok                8.826     8.744     8.844   46    1    218.1      324.0  8.25e-03  4.93e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  4096   4  flashtile-atomic  ok                9.504     9.497     9.542   43    1    202.5      580.0  8.25e-03  4.93e-03
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  4096   4  sdpa-flash        ok                7.331     7.221     7.359   55    1    262.5     1092.0  8.25e-03  4.93e-03
+  4096   4  sdpa-cudnn        ok                7.837     7.817     7.867   52    1    245.6     1092.0  8.25e-03  3.65e-03
+  4096   4  sdpa-efficient    ok               33.928    33.911    33.966   20    1     56.7      972.3  8.25e-03  6.13e-03
+  4096   4  naive             ok              143.868   143.802   143.911   20    1     13.4    33664.0  7.71e-03  2.66e-03
+  8192   2  flashtile-triton  ok               16.898    16.858    16.929   24    1    227.8      324.0  7.59e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  8192   2  flashtile-atomic  ok               17.634    17.620    17.725   23    1    218.3      580.0  7.59e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  8192   2  sdpa-flash        ok               13.117    12.854    13.226   31    1    293.4     1092.0  7.59e-03 -
+  8192   2  sdpa-cudnn        ok               14.204    13.934    14.294   29    1    271.0     1092.0  7.59e-03 -
+  8192   2  sdpa-efficient    ok               60.036    59.991    60.115   20    1     64.1      976.3  7.59e-03 -
+  8192   2  naive             ok              289.996   289.958   290.054   20    1     13.3    66432.0  7.59e-03 -
+ 16384   1  flashtile-triton  ok               33.085    33.057    33.126   20    1    232.6      324.0  6.16e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+ 16384   1  flashtile-atomic  ok               33.954    33.939    33.982   20    1    226.7      580.0  6.16e-03 -
+            autotune: fwd: BLOCK_M: 128, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 128, BLOCK_N: 32, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+ 16384   1  sdpa-flash        ok               24.718    24.493    24.783   20    1    311.4     1092.0  6.16e-03 -
+ 16384   1  sdpa-cudnn        ok               26.849    26.324    26.883   20    1    286.7     1092.0  6.16e-03 -
+ 16384   1  sdpa-efficient    ok              116.061   116.023   116.153   20    1     66.3      976.3  6.16e-03 -
+ 16384   1  naive             oom          - - -    0    0 - -  6.16e-03 -   (CUDA out of memory. Tried to allocate 32.00 GiB. GPU 0 has a total capacity of 95.01 GiB o)
+
+--- workload qwen3.5-d256  Hq=16 Hkv=4 d=256  causal=True  mode=fwd ---
+     L   B  backend           status        median ms       p10       p90    n reps  TFLOP/s   peak MiB   fwd err  grad err
+   512  32  flashtile-triton  ok                0.481     0.480     0.482  208    4    143.2      129.0  7.66e-03 -
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+   512  32  sdpa-flash        ok                0.330     0.330     0.331  202    6    208.4      129.0  7.66e-03 -
+   512  32  sdpa-cudnn        unsupported  - - -    0    0 - - - -   (No available kernel. Aborting execution.)
+   512  32  sdpa-efficient    ok                0.917     0.916     0.918  146    3     75.1      384.0  7.66e-03 -
+   512  32  naive             ok                7.328     7.323     7.333   55    1      9.4     2305.3  7.66e-03 -
+  1024  16  flashtile-triton  ok                0.810     0.809     0.811  165    3    169.8      129.0  8.61e-03 -
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  1024  16  sdpa-flash        ok                0.536     0.533     0.538  187    4    256.5      129.0  8.61e-03 -
+  1024  16  sdpa-cudnn        unsupported  - - -    0    0 - - - -   (No available kernel. Aborting execution.)
+  1024  16  sdpa-efficient    ok                1.579     1.578     1.580  127    2     87.1      384.0  8.61e-03 -
+  1024  16  naive             ok               12.556    12.544    12.564   32    1     11.0     3460.3  7.75e-03 -
+  2048   8  flashtile-triton  ok                1.489     1.487     1.490  135    2    184.8      129.0  8.70e-03 -
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  2048   8  sdpa-flash        ok                0.960     0.940     0.964  140    3    286.6      129.0  8.70e-03 -
+  2048   8  sdpa-cudnn        unsupported  - - -    0    0 - - - -   (No available kernel. Aborting execution.)
+  2048   8  sdpa-efficient    ok                2.875     2.873     2.878  140    1     95.6      384.0  8.70e-03 -
+  2048   8  naive             ok               23.037    23.017    23.054   20    1     11.9     5776.3  7.50e-03 -
+  4096   4  flashtile-triton  ok                2.810     2.808     2.813  143    1    195.7      129.0  7.57e-03 -
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  4096   4  sdpa-flash        ok                1.799     1.742     1.810  112    2    305.6      129.0  7.57e-03 -
+  4096   4  sdpa-cudnn        unsupported  - - -    0    0 - - - -   (No available kernel. Aborting execution.)
+  4096   4  sdpa-efficient    ok                5.431     5.428     5.433   74    1    101.3      384.0  7.57e-03 -
+  4096   4  naive             ok               46.306    46.289    46.342   20    1     11.9    10432.3  7.57e-03 -
+  8192   2  flashtile-triton  ok                5.404     5.402     5.407   75    1    203.5      129.0  7.59e-03 -
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+  8192   2  sdpa-flash        ok                3.481     3.343     3.498  116    1    315.9      129.0  7.59e-03 -
+  8192   2  sdpa-cudnn        unsupported  - - -    0    0 - - - -   (No available kernel. Aborting execution.)
+  8192   2  sdpa-efficient    ok               10.512    10.508    10.517   39    1    104.6      384.0  7.59e-03 -
+  8192   2  naive             ok               91.267    91.192    91.292   20    1     12.0    19840.3  7.59e-03 -
+ 16384   1  flashtile-triton  ok               10.638    10.636    10.642   38    1    206.7      129.0  7.98e-03 -
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None
+ 16384   1  sdpa-flash        ok                6.825     6.531     6.878   59    1    322.2      129.0  7.98e-03 -
+ 16384   1  sdpa-cudnn        unsupported  - - -    0    0 - - - -   (No available kernel. Aborting execution.)
+ 16384   1  sdpa-efficient    ok               20.615    20.610    20.620   20    1    106.7      384.0  7.98e-03 -
+ 16384   1  naive             ok              186.441   186.432   186.470   20    1     11.8    39040.3  7.64e-03 -
+
+--- workload qwen3.5-d256  Hq=16 Hkv=4 d=256  causal=True  mode=fwd+bwd ---
+     L   B  backend           status        median ms       p10       p90    n reps  TFLOP/s   peak MiB   fwd err  grad err
+   512  32  flashtile-triton  ok                2.530     2.526     2.534  159    1     95.3      322.0  7.66e-03  5.52e-03
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None
+   512  32  flashtile-atomic  ok                4.469     4.414     4.515   90    1     53.9      578.0  7.66e-03  5.52e-03
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None
+   512  32  sdpa-flash        ok                2.777     2.774     2.781  145    1     86.8     1090.0  7.66e-03  5.52e-03
+   512  32  sdpa-cudnn        unsupported  - - -    0    0 - - - -   (No available kernel. Aborting execution.)
+   512  32  sdpa-efficient    ok                5.048     5.034     5.063   80    1     47.7     1026.1  7.66e-03  5.52e-03
+   512  32  naive             ok               15.525    15.511    15.540   26    1     15.5     2944.0  7.66e-03  3.37e-03
+  1024  16  flashtile-triton  ok                4.100     4.093     4.110   98    1    117.4      322.0  8.61e-03  3.63e-03
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None
+  1024  16  flashtile-atomic  ok                5.078     5.070     5.091   79    1     94.8      578.0  8.61e-03  3.63e-03
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None
+  1024  16  sdpa-flash        ok                3.671     3.667     3.677  109    1    131.2     1090.0  8.61e-03  3.63e-03
+  1024  16  sdpa-cudnn        unsupported  - - -    0    0 - - - -   (No available kernel. Aborting execution.)
+  1024  16  sdpa-efficient    ok                9.426     9.366     9.473   43    1     51.1      994.1  8.61e-03  5.24e-03
+  1024  16  naive             ok               26.236    26.215    26.265   20    1     18.4     4992.0  7.75e-03  2.40e-03
+  2048   8  flashtile-triton  ok                7.451     7.441     7.468   54    1    129.2      322.0  8.70e-03  4.30e-03
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None
+  2048   8  flashtile-atomic  ok                7.361     7.345     7.372   55    1    130.8      578.0  8.70e-03  4.30e-03
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None
+  2048   8  sdpa-flash        ok                5.549     5.543     5.559   73    1    173.5     1090.0  8.70e-03  5.16e-03
+  2048   8  sdpa-cudnn        unsupported  - - -    0    0 - - - -   (No available kernel. Aborting execution.)
+  2048   8  sdpa-efficient    ok               15.467    15.436    15.483   26    1     62.2      978.1  8.70e-03  4.54e-03
+  2048   8  naive             ok               48.041    48.022    48.075   20    1     20.0     9088.0  7.50e-03  3.35e-03
+  4096   4  flashtile-triton  ok               14.183    14.169    14.243   29    1    135.7      322.0  7.57e-03  3.79e-03
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None
+  4096   4  flashtile-atomic  ok               12.684    12.673    12.720   32    1    151.7        0.0  7.57e-03  3.79e-03
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None
+  4096   4  sdpa-flash        ok                9.347     9.315     9.373   43    1    205.9     1090.0  7.57e-03  3.97e-03
+  4096   4  sdpa-cudnn        unsupported  - - -    0    0 - - - -   (No available kernel. Aborting execution.)
+  4096   4  sdpa-efficient    ok               36.424    36.360    36.510   20    1     52.8      986.1  7.57e-03  4.63e-03
+  4096   4  naive             ok               93.813    93.768    93.846   20    1     20.5    17280.0  7.57e-03  3.08e-03
+  8192   2  flashtile-triton  ok               27.619    27.604    27.652   20    1    139.4      322.0  7.59e-03 -
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None
+  8192   2  flashtile-atomic  ok               23.546    23.530    23.572   20    1    163.5      578.0  7.59e-03 -
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None
+  8192   2  sdpa-flash        ok               17.054    16.989    17.190   24    1    225.7     1090.0  7.59e-03 -
+  8192   2  sdpa-cudnn        unsupported  - - -    0    0 - - - -   (No available kernel. Aborting execution.)
+  8192   2  sdpa-efficient    ok               72.267    72.181    72.472   20    1     53.3      986.1  7.59e-03 -
+  8192   2  naive             ok              184.191   184.090   184.245   20    1     20.9    33664.0  7.59e-03 -
+ 16384   1  flashtile-triton  ok               54.456    54.411    54.658   20    1    141.3      322.0  7.98e-03 -
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None
+ 16384   1  flashtile-atomic  ok               45.756    45.653    45.881   20    1    168.2      578.0  7.98e-03 -
+            autotune: fwd: BLOCK_M: 64, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None; bwd_dkdv: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None; bwd_dq: BLOCK_M: 32, BLOCK_N: 32, num_warps: 4, num_ctas: 1, num_stages: 1, maxnreg: None, ir_override: None
+ 16384   1  sdpa-flash        ok               32.678    32.301    32.739   20    1    235.5     1090.0  7.98e-03 -
+ 16384   1  sdpa-cudnn        unsupported  - - -    0    0 - - - -   (No available kernel. Aborting execution.)
+ 16384   1  sdpa-efficient    ok              140.515   140.022   140.810   20    1     54.8      986.1  7.98e-03 -
+ 16384   1  naive             ok              379.599   379.547   379.755   20    1     20.3    66432.0  7.64e-03 -
+
+330 rows written: ok=316, parity-fail=0, unsupported=12, oom=2, error=0

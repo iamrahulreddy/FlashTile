@@ -1,0 +1,210 @@
+======================================================================
+FlashTile Benchmark Suite
+======================================================================
+Device: NVIDIA B200 (sm_100, 148 SMs)
+Workload: mha-d128  (Hq=16, Hkv=16, head dim=128)  Mode: fwd
+Sequence lengths: [512, 1024, 2048, 4096, 8192, 16384]
+Batch: [32, 16, 8, 4, 2, 1] (batch x length = 16384 tokens)
+Causal: False
+dtype: bfloat16
+Timing: median of >= 20 samples, each >= 2 ms of back-to-back calls (CUDA events)
+======================================================================
+
+📊 Benchmarking FlashTile (Triton)...
+  Testing seq_len=512... OK (mem=65.0MB, time=0.217ms, 316.3 TFLOP/s, max err=1.18e-03)
+  Testing seq_len=1024... OK (mem=65.0MB, time=0.347ms, 396.2 TFLOP/s, max err=6.70e-04)
+  Testing seq_len=2048... OK (mem=65.0MB, time=0.608ms, 452.5 TFLOP/s, max err=8.95e-04)
+  Testing seq_len=4096... OK (mem=65.0MB, time=1.069ms, 514.4 TFLOP/s, max err=4.34e-04)
+  Testing seq_len=8192... OK (mem=65.0MB, time=2.034ms, 540.4 TFLOP/s, max err=3.23e-04)
+  Testing seq_len=16384... OK (mem=65.0MB, time=3.881ms, 566.5 TFLOP/s, max err=2.30e-04)
+
+📊 Benchmarking PyTorch SDPA flash...
+  Testing seq_len=512... OK (mem=65.0MB, time=0.203ms, 338.9 TFLOP/s, max err=1.09e-03)
+  Testing seq_len=1024... OK (mem=65.0MB, time=0.376ms, 365.5 TFLOP/s, max err=7.00e-04)
+  Testing seq_len=2048... OK (mem=65.0MB, time=0.723ms, 380.1 TFLOP/s, max err=8.95e-04)
+  Testing seq_len=4096... OK (mem=65.0MB, time=1.415ms, 388.7 TFLOP/s, max err=4.34e-04)
+  Testing seq_len=8192... OK (mem=65.0MB, time=2.802ms, 392.4 TFLOP/s, max err=3.17e-04)
+  Testing seq_len=16384... OK (mem=65.0MB, time=5.545ms, 396.6 TFLOP/s, max err=2.30e-04)
+
+📊 Benchmarking PyTorch SDPA cuDNN...
+  Testing seq_len=512... OK (mem=64.0MB, time=0.078ms, 875.9 TFLOP/s, max err=1.23e-03)
+  Testing seq_len=1024... OK (mem=64.0MB, time=0.129ms, 1067.2 TFLOP/s, max err=8.60e-04)
+  Testing seq_len=2048... OK (mem=64.0MB, time=0.229ms, 1200.9 TFLOP/s, max err=8.95e-04)
+  Testing seq_len=4096... OK (mem=64.0MB, time=0.431ms, 1275.9 TFLOP/s, max err=4.34e-04)
+  Testing seq_len=8192... OK (mem=64.0MB, time=0.844ms, 1302.5 TFLOP/s, max err=3.16e-04)
+  Testing seq_len=16384... OK (mem=64.0MB, time=1.615ms, 1361.5 TFLOP/s, max err=2.58e-04)
+
+📊 Benchmarking PyTorch SDPA mem-efficient...
+  Testing seq_len=512... OK (mem=64.0MB, time=0.493ms, 139.4 TFLOP/s, max err=1.18e-03)
+  Testing seq_len=1024... OK (mem=64.0MB, time=0.907ms, 151.5 TFLOP/s, max err=6.86e-04)
+  Testing seq_len=2048... OK (mem=64.0MB, time=1.764ms, 155.8 TFLOP/s, max err=8.95e-04)
+  Testing seq_len=4096... OK (mem=64.0MB, time=3.434ms, 160.1 TFLOP/s, max err=4.34e-04)
+  Testing seq_len=8192... OK (mem=64.0MB, time=6.784ms, 162.1 TFLOP/s, max err=3.23e-04)
+  Testing seq_len=16384... OK (mem=64.0MB, time=13.483ms, 163.1 TFLOP/s, max err=2.30e-04)
+
+📊 Benchmarking Naive (PyTorch math, O(N²))...
+  Testing seq_len=512... OK (mem=1664.3MB, time=2.569ms, 26.7 TFLOP/s, max err=9.61e-04)
+  Testing seq_len=1024... OK (mem=2816.3MB, time=4.721ms, 29.1 TFLOP/s, max err=4.88e-04)
+  Testing seq_len=2048... OK (mem=5120.3MB, time=9.316ms, 29.5 TFLOP/s, max err=8.95e-04)
+  Testing seq_len=4096... OK (mem=9728.3MB, time=19.245ms, 28.6 TFLOP/s, max err=4.34e-04)
+  Testing seq_len=8192... OK (mem=18944.3MB, time=39.265ms, 28.0 TFLOP/s, max err=2.44e-04)
+  Testing seq_len=16384... OK (mem=37376.3MB, time=70.445ms, 31.2 TFLOP/s, max err=2.30e-04)
+
+======================================================================
+Benchmark Summary
+======================================================================
+
+FlashTile (Triton):
+  Memory (MB): [65.0, 65.0, 65.0, 65.0, 65.0, 65.0]
+  Time (ms):   [0.217, 0.347, 0.608, 1.069, 2.034, 3.881]
+  TFLOP/s:     [316.3, 396.2, 452.5, 514.4, 540.4, 566.5]
+  Speedup vs naive: [11.82, 13.61, 15.33, 18.01, 19.3, 18.15]
+  Memory reduction vs naive: [25.6, 43.3, 78.8, 149.7, 291.5, 575.0]
+
+PyTorch SDPA flash:
+  Memory (MB): [65.0, 65.0, 65.0, 65.0, 65.0, 65.0]
+  Time (ms):   [0.203, 0.376, 0.723, 1.415, 2.802, 5.545]
+  TFLOP/s:     [338.9, 365.5, 380.1, 388.7, 392.4, 396.6]
+  Speedup vs naive: [12.67, 12.55, 12.88, 13.61, 14.01, 12.71]
+  Memory reduction vs naive: [25.6, 43.3, 78.8, 149.7, 291.4, 575.0]
+
+PyTorch SDPA cuDNN:
+  Memory (MB): [64.0, 64.0, 64.0, 64.0, 64.0, 64.0]
+  Time (ms):   [0.078, 0.129, 0.229, 0.431, 0.844, 1.615]
+  TFLOP/s:     [875.9, 1067.2, 1200.9, 1275.9, 1302.5, 1361.5]
+  Speedup vs naive: [32.75, 36.66, 40.7, 44.66, 46.51, 43.61]
+  Memory reduction vs naive: [26.0, 44.0, 80.0, 152.0, 296.0, 584.0]
+
+PyTorch SDPA mem-efficient:
+  Memory (MB): [64.0, 64.0, 64.0, 64.0, 64.0, 64.0]
+  Time (ms):   [0.493, 0.907, 1.764, 3.434, 6.784, 13.483]
+  TFLOP/s:     [139.4, 151.5, 155.8, 160.1, 162.1, 163.1]
+  Speedup vs naive: [5.21, 5.2, 5.28, 5.6, 5.79, 5.22]
+  Memory reduction vs naive: [26.0, 44.0, 80.0, 152.0, 296.0, 584.0]
+
+Naive (PyTorch math, O(N²)):
+  Memory (MB): [1664.3, 2816.3, 5120.3, 9728.3, 18944.3, 37376.3]
+  Time (ms):   [2.569, 4.721, 9.316, 19.245, 39.265, 70.445]
+  TFLOP/s:     [26.7, 29.1, 29.5, 28.6, 28.0, 31.2]
+
+FlashTile time / fastest PyTorch SDPA time (below 1.00 = FlashTile faster):
+  seq_len=512: 2.77  (fastest: sdpa-cudnn)
+  seq_len=1024: 2.69  (fastest: sdpa-cudnn)
+  seq_len=2048: 2.65  (fastest: sdpa-cudnn)
+  seq_len=4096: 2.48  (fastest: sdpa-cudnn)
+  seq_len=8192: 2.41  (fastest: sdpa-cudnn)
+  seq_len=16384: 2.40  (fastest: sdpa-cudnn)
+
+
+======================================================================
+FlashTile Benchmark Suite
+======================================================================
+Device: NVIDIA B200 (sm_100, 148 SMs)
+Workload: mha-d128  (Hq=16, Hkv=16, head dim=128)  Mode: fwd+bwd
+Sequence lengths: [512, 1024, 2048, 4096, 8192, 16384]
+Batch: [32, 16, 8, 4, 2, 1] (batch x length = 16384 tokens)
+Causal: False
+dtype: bfloat16
+Timing: median of >= 20 samples, each >= 2 ms of back-to-back calls (CUDA events)
+======================================================================
+
+📊 Benchmarking FlashTile (Triton)...
+  Testing seq_len=512... OK (mem=258.0MB, time=0.880ms, 273.2 TFLOP/s, max err=1.18e-03)
+  Testing seq_len=1024... OK (mem=258.0MB, time=1.382ms, 348.1 TFLOP/s, max err=6.70e-04)
+  Testing seq_len=2048... OK (mem=258.0MB, time=2.466ms, 390.2 TFLOP/s, max err=8.95e-04)
+  Testing seq_len=4096... OK (mem=258.0MB, time=4.420ms, 435.3 TFLOP/s, max err=4.34e-04)
+  Testing seq_len=8192... OK (mem=258.0MB, time=8.365ms, 460.0 TFLOP/s, max err=3.23e-04)
+  Testing seq_len=16384... OK (mem=258.0MB, time=16.348ms, 470.8 TFLOP/s, max err=2.30e-04)
+
+📊 Benchmarking FlashTile (Triton, atomic-dQ backward)...
+  Testing seq_len=512... OK (mem=386.0MB, time=1.162ms, 207.0 TFLOP/s, max err=1.18e-03)
+  Testing seq_len=1024... OK (mem=386.0MB, time=1.882ms, 255.6 TFLOP/s, max err=6.70e-04)
+  Testing seq_len=2048... OK (mem=386.0MB, time=3.408ms, 282.3 TFLOP/s, max err=8.95e-04)
+  Testing seq_len=4096... OK (mem=386.0MB, time=6.312ms, 304.9 TFLOP/s, max err=4.34e-04)
+  Testing seq_len=8192... OK (mem=386.0MB, time=12.152ms, 316.7 TFLOP/s, max err=3.23e-04)
+  Testing seq_len=16384... OK (mem=386.0MB, time=23.864ms, 322.5 TFLOP/s, max err=2.30e-04)
+
+📊 Benchmarking PyTorch SDPA flash...
+  Testing seq_len=512... OK (mem=514.0MB, time=1.018ms, 236.3 TFLOP/s, max err=1.09e-03)
+  Testing seq_len=1024... OK (mem=514.0MB, time=1.652ms, 291.1 TFLOP/s, max err=7.00e-04)
+  Testing seq_len=2048... OK (mem=514.0MB, time=2.950ms, 326.2 TFLOP/s, max err=8.95e-04)
+  Testing seq_len=4096... OK (mem=514.0MB, time=5.482ms, 351.0 TFLOP/s, max err=4.34e-04)
+  Testing seq_len=8192... OK (mem=514.0MB, time=10.553ms, 364.7 TFLOP/s, max err=3.17e-04)
+  Testing seq_len=16384... OK (mem=514.0MB, time=20.663ms, 372.5 TFLOP/s, max err=2.30e-04)
+
+📊 Benchmarking PyTorch SDPA cuDNN...
+  Testing seq_len=512... OK (mem=386.0MB, time=0.362ms, 664.7 TFLOP/s, max err=1.23e-03)
+  Testing seq_len=1024... OK (mem=386.0MB, time=0.558ms, 862.5 TFLOP/s, max err=8.60e-04)
+  Testing seq_len=2048... OK (mem=387.0MB, time=0.953ms, 1009.9 TFLOP/s, max err=8.95e-04)
+  Testing seq_len=4096... OK (mem=387.0MB, time=1.728ms, 1113.8 TFLOP/s, max err=4.34e-04)
+  Testing seq_len=8192... OK (mem=387.0MB, time=3.313ms, 1161.6 TFLOP/s, max err=3.16e-04)
+  Testing seq_len=16384... OK (mem=387.0MB, time=6.478ms, 1188.2 TFLOP/s, max err=2.58e-04)
+
+📊 Benchmarking PyTorch SDPA mem-efficient...
+  Testing seq_len=512... OK (mem=450.0MB, time=2.185ms, 110.1 TFLOP/s, max err=1.18e-03)
+  Testing seq_len=1024... OK (mem=450.0MB, time=3.931ms, 122.4 TFLOP/s, max err=6.86e-04)
+  Testing seq_len=2048... OK (mem=450.0MB, time=7.460ms, 129.0 TFLOP/s, max err=8.95e-04)
+  Testing seq_len=4096... OK (mem=450.0MB, time=14.459ms, 133.1 TFLOP/s, max err=4.34e-04)
+  Testing seq_len=8192... OK (mem=450.0MB, time=28.539ms, 134.8 TFLOP/s, max err=3.23e-04)
+  Testing seq_len=16384... OK (mem=450.0MB, time=56.915ms, 135.2 TFLOP/s, max err=2.30e-04)
+
+📊 Benchmarking Naive (PyTorch math, O(N²))...
+  Testing seq_len=512... OK (mem=2496.0MB, time=5.832ms, 41.2 TFLOP/s, max err=9.61e-04)
+  Testing seq_len=1024... OK (mem=4544.0MB, time=10.844ms, 44.4 TFLOP/s, max err=4.88e-04)
+  Testing seq_len=2048... OK (mem=8640.0MB, time=21.228ms, 45.3 TFLOP/s, max err=8.95e-04)
+  Testing seq_len=4096... OK (mem=16832.0MB, time=42.779ms, 45.0 TFLOP/s, max err=4.34e-04)
+  Testing seq_len=8192... OK (mem=33216.0MB, time=84.985ms, 45.3 TFLOP/s, max err=2.44e-04)
+  Testing seq_len=16384... OK (mem=65984.0MB, time=162.494ms, 47.4 TFLOP/s, max err=2.30e-04)
+
+======================================================================
+Benchmark Summary
+======================================================================
+
+FlashTile (Triton):
+  Memory (MB): [258.0, 258.0, 258.0, 258.0, 258.0, 258.0]
+  Time (ms):   [0.88, 1.382, 2.466, 4.42, 8.365, 16.348]
+  TFLOP/s:     [273.2, 348.1, 390.2, 435.3, 460.0, 470.8]
+  Speedup vs naive: [6.62, 7.85, 8.61, 9.68, 10.16, 9.94]
+  Memory reduction vs naive: [9.7, 17.6, 33.5, 65.2, 128.7, 255.8]
+
+FlashTile (Triton, atomic-dQ backward):
+  Memory (MB): [386.0, 386.0, 386.0, 386.0, 386.0, 386.0]
+  Time (ms):   [1.162, 1.882, 3.408, 6.312, 12.152, 23.864]
+  TFLOP/s:     [207.0, 255.6, 282.3, 304.9, 316.7, 322.5]
+  Speedup vs naive: [5.02, 5.76, 6.23, 6.78, 6.99, 6.81]
+  Memory reduction vs naive: [6.5, 11.8, 22.4, 43.6, 86.1, 170.9]
+
+PyTorch SDPA flash:
+  Memory (MB): [514.0, 514.0, 514.0, 514.0, 514.0, 514.0]
+  Time (ms):   [1.018, 1.652, 2.95, 5.482, 10.553, 20.663]
+  TFLOP/s:     [236.3, 291.1, 326.2, 351.0, 364.7, 372.5]
+  Speedup vs naive: [5.73, 6.56, 7.2, 7.8, 8.05, 7.86]
+  Memory reduction vs naive: [4.9, 8.8, 16.8, 32.7, 64.6, 128.4]
+
+PyTorch SDPA cuDNN:
+  Memory (MB): [386.0, 386.0, 387.0, 387.0, 387.0, 387.0]
+  Time (ms):   [0.362, 0.558, 0.953, 1.728, 3.313, 6.478]
+  TFLOP/s:     [664.7, 862.5, 1009.9, 1113.8, 1161.6, 1188.2]
+  Speedup vs naive: [16.12, 19.44, 22.28, 24.76, 25.65, 25.09]
+  Memory reduction vs naive: [6.5, 11.8, 22.3, 43.5, 85.8, 170.5]
+
+PyTorch SDPA mem-efficient:
+  Memory (MB): [450.0, 450.0, 450.0, 450.0, 450.0, 450.0]
+  Time (ms):   [2.185, 3.931, 7.46, 14.459, 28.539, 56.915]
+  TFLOP/s:     [110.1, 122.4, 129.0, 133.1, 134.8, 135.2]
+  Speedup vs naive: [2.67, 2.76, 2.85, 2.96, 2.98, 2.86]
+  Memory reduction vs naive: [5.5, 10.1, 19.2, 37.4, 73.8, 146.6]
+
+Naive (PyTorch math, O(N²)):
+  Memory (MB): [2496.0, 4544.0, 8640.0, 16832.0, 33216.0, 65984.0]
+  Time (ms):   [5.832, 10.844, 21.228, 42.779, 84.985, 162.494]
+  TFLOP/s:     [41.2, 44.4, 45.3, 45.0, 45.3, 47.4]
+
+FlashTile time / fastest PyTorch SDPA time (below 1.00 = FlashTile faster):
+  seq_len=512: 2.43  (fastest: sdpa-cudnn)
+  seq_len=1024: 2.48  (fastest: sdpa-cudnn)
+  seq_len=2048: 2.59  (fastest: sdpa-cudnn)
+  seq_len=4096: 2.56  (fastest: sdpa-cudnn)
+  seq_len=8192: 2.53  (fastest: sdpa-cudnn)
+  seq_len=16384: 2.52  (fastest: sdpa-cudnn)
+

@@ -1,0 +1,15 @@
+{
+  "date_utc": "2026-11-17 14:58:06",
+  "gpu": "NVIDIA B200",
+  "compute_capability": "sm_100",
+  "gpu_memory_gib": 178.3,
+  "sm_count": 148,
+  "python": "3.12.10",
+  "torch": "2.15.0+cu132",
+  "cuda_runtime": "13.2",
+  "cudnn": 92600,
+  "triton": "3.9.0",
+  "provider": "Modal",
+  "quick": false,
+  "finished_utc": "2026-11-17 15:44:12"
+}

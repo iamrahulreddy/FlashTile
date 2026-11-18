@@ -1,0 +1,183 @@
+==============================================================================
+Qwen/Qwen3.8-27B: SDPA vs FA2 vs cuDNN vs FlashTile, same five prompts
+==============================================================================
+GPU: NVIDIA H200  sm_90  140 GiB
+torch 2.15.0+cu132  cuDNN 92600  transformers 5.23.0
+FA2 = PyTorch's built-in FlashAttention-2 kernel (SDPBackend.FLASH_ATTENTION). The flash-attn package has no wheels for torch 2.15 / CUDA 13, so attn_implementation='flash_attention_2' isn't an option here.
+Loaded in 1028s (download included on the first run), 51.0 GiB on GPU
+64 layers, softmax attention in 16 of them [3, 7, 11, 15, 19, 23, 27, 31, 35, 39, 43, 47, 51, 55, 59, 63] (Hq=24, Hkv=4, d=256), the rest Gated DeltaNet
+Prompts: short (30 tokens), math (62 tokens), code (39 tokens), docs_qa (22263 tokens), code_qa (33846 tokens)
+Each path: 1 warmup + 3 timed prefills (median), then 1 warmup + 1 timed greedy generation of up to 256 tokens. Attention time = CUDA events around every attention call.
+
+📊 Which attention kernels actually ran (torch.profiler, one prefill of the 'short' prompt)...
+  SDPA (default pick):
+      cudaGetErrorString
+      cudnn_generated_fort_native_sdpa_sm90_flash_fprop_wgmma_f16_knob_1_64x128x256_4x1x1_cga1x1x1_kernel0_0
+  FA2 (SDPA flash backend):
+      cudaFuncSetAttribute
+      void pytorch_flash::flash_fwd_kernel<Flash_fwd_kernel_traits<256, 64, 64, 4, false, false, cutlass::bfloat16_t, Flash_kernel_traits<256, 64, 64, 4, cu
+  cuDNN (SDPA cuDNN backend):
+      cudaGetErrorString
+      cudnn_generated_fort_native_sdpa_sm90_flash_fprop_wgmma_f16_knob_1_64x128x256_4x1x1_cga1x1x1_kernel0_0
+  FlashTile:
+      _fwd_kernel
+
+📊 [short] 30 prompt tokens
+  sdpa      prefill     114 ms (attention    2.6 ms)  decode  11.7 tok/s (attention 1.92 ms/token)  peak +61 MiB prefill / +192 MiB generate  100 tokens
+  fa2       prefill     135 ms (attention    2.6 ms)  decode  11.8 tok/s (attention 2.41 ms/token)  peak +61 MiB prefill / +192 MiB generate  109 tokens
+  cudnn     prefill     135 ms (attention    3.1 ms)  decode  12.0 tok/s (attention 2.58 ms/token)  peak +61 MiB prefill / +192 MiB generate  100 tokens
+  flashtile prefill     115 ms (attention    4.1 ms)  decode  11.4 tok/s (attention 4.02 ms/token)  peak +61 MiB prefill / +192 MiB generate  109 tokens  FlashTile calls={'causal': 16, 'decode': 1728}
+  fa2       vs SDPA, last 64 positions: max |dlogit| 2.219  mean 0.0323  top-1 agree 100.0%  KL 2.33e-04
+  cudnn     vs SDPA, last 64 positions: max |dlogit| 0.000  mean 0.0000  top-1 agree 100.0%  KL 0.00e+00
+  flashtile vs SDPA, last 64 positions: max |dlogit| 3.656  mean 0.0348  top-1 agree 100.0%  KL 1.31e-03
+  greedy sdpa vs fa2: diverge at token 67 (100 vs 109 tokens)
+  greedy sdpa vs cudnn: IDENTICAL (100 vs 100 tokens)
+  greedy sdpa vs flashtile: diverge at token 67 (100 vs 109 tokens)
+  greedy fa2 vs cudnn: diverge at token 67 (109 vs 100 tokens)
+  greedy fa2 vs flashtile: IDENTICAL (109 vs 109 tokens)
+  greedy cudnn vs flashtile: diverge at token 67 (100 vs 109 tokens)
+  FlashTile answer: Grouped-Query Attention (GQA) is a hybrid attention mechanism that partitions the query heads into groups, where each group shares a single set of key and value heads rather than having unique ones for every query. This design significantly reduces the number of key-value pairs that must be stored in the KV cache during the autoregressive decoding process, as the shared heads are computed and cached only once per group. Consequently, this reduction in cache size lowers memory bandwidth requirements and allows for larger batch sizes or longer context windows without exceeding hardware memory limits.
+
+📊 [math] 62 prompt tokens
+  sdpa      prefill     139 ms (attention    2.7 ms)  decode  11.8 tok/s (attention 1.89 ms/token)  peak +91 MiB prefill / +205 MiB generate  256 tokens
+  fa2       prefill     118 ms (attention    2.5 ms)  decode  11.6 tok/s (attention 2.52 ms/token)  peak +91 MiB prefill / +205 MiB generate  256 tokens
+  cudnn     prefill     128 ms (attention    3.4 ms)  decode  11.8 tok/s (attention 2.61 ms/token)  peak +91 MiB prefill / +205 MiB generate  256 tokens
+  flashtile prefill     118 ms (attention    4.1 ms)  decode  11.5 tok/s (attention 4.04 ms/token)  peak +91 MiB prefill / +205 MiB generate  256 tokens  FlashTile calls={'causal': 16, 'decode': 4080}
+  fa2       vs SDPA, last 64 positions: max |dlogit| 1.516  mean 0.0268  top-1 agree 100.0%  KL 2.94e-04
+  cudnn     vs SDPA, last 64 positions: max |dlogit| 0.000  mean 0.0000  top-1 agree 100.0%  KL 0.00e+00
+  flashtile vs SDPA, last 64 positions: max |dlogit| 0.750  mean 0.0171  top-1 agree 100.0%  KL 1.68e-04
+  greedy sdpa vs fa2: IDENTICAL (256 vs 256 tokens)
+  greedy sdpa vs cudnn: IDENTICAL (256 vs 256 tokens)
+  greedy sdpa vs flashtile: IDENTICAL (256 vs 256 tokens)
+  greedy fa2 vs cudnn: IDENTICAL (256 vs 256 tokens)
+  greedy fa2 vs flashtile: IDENTICAL (256 vs 256 tokens)
+  greedy cudnn vs flashtile: IDENTICAL (256 vs 256 tokens)
+  FlashTile answer: Here are the steps to solve the problem:
+    
+    **1. Determine the net rate of water flow**
+    Calculate how much the water level rises per minute by subtracting the outflow rate from the inflow rate.
+    $$ \text{Net Rate} = \text{Inflow} - \text{Outflow} $$
+    $$ \text{Net Rate} = 12 \text{ L/min} - 4.5 \text{ L/min} = 7.5 \text{ L/min} $$
+    
+    **2. Determine the volume needed to fill the tank**
+    Calculate the difference between the tank's total capacity and the starting volume.
+    $$ \text{Volume Needed} = \text{Total Capacity} - \text{Starting Volume} $$
+    $$ \text{Volume Needed} = 300 \text{ L} - 30 \text{ L} = 270 \text{ L} $$
+    
+    **3. Calculate the time required**
+    Divide the volume needed by the net rate to find the time in minutes.
+    $$ \text{Time} = \frac{\text{Volume Needed}}{\text{Net Rate}} $$
+    $$ \text{Time} = \frac
+
+📊 [code] 39 prompt tokens
+  sdpa      prefill     122 ms (attention    2.5 ms)  decode  11.5 tok/s (attention 1.99 ms/token)  peak +69 MiB prefill / +202 MiB generate  256 tokens
+  fa2       prefill     133 ms (attention    3.7 ms)  decode  14.0 tok/s (attention 2.08 ms/token)  peak +69 MiB prefill / +202 MiB generate  256 tokens
+  cudnn     prefill      99 ms (attention    2.6 ms)  decode  13.9 tok/s (attention 2.26 ms/token)  peak +69 MiB prefill / +202 MiB generate  256 tokens
+  flashtile prefill     106 ms (attention    3.7 ms)  decode  13.8 tok/s (attention 3.38 ms/token)  peak +69 MiB prefill / +202 MiB generate  256 tokens  FlashTile calls={'causal': 16, 'decode': 4080}
+  fa2       vs SDPA, last 64 positions: max |dlogit| 1.078  mean 0.0307  top-1 agree 97.4%  KL 3.56e-04
+  cudnn     vs SDPA, last 64 positions: max |dlogit| 0.000  mean 0.0000  top-1 agree 100.0%  KL 0.00e+00
+  flashtile vs SDPA, last 64 positions: max |dlogit| 0.500  mean 0.0216  top-1 agree 100.0%  KL 1.60e-04
+  greedy sdpa vs fa2: diverge at token 79 (256 vs 256 tokens)
+  greedy sdpa vs cudnn: IDENTICAL (256 vs 256 tokens)
+  greedy sdpa vs flashtile: diverge at token 79 (256 vs 256 tokens)
+  greedy fa2 vs cudnn: diverge at token 79 (256 vs 256 tokens)
+  greedy fa2 vs flashtile: IDENTICAL (256 vs 256 tokens)
+  greedy cudnn vs flashtile: diverge at token 79 (256 vs 256 tokens)
+  FlashTile answer: ```python
+    def merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:
+        """
+        Merge overlapping intervals in a list of (start, end) pairs.
+        
+        Args:
+            intervals: A list of tuples, each representing an interval as (start, end).
+            
+        Returns:
+            A list of merged, non-overlapping intervals sorted by start time.
+        """
+        if not intervals:
+            return []
+        
+        # Sort intervals by start time
+        sorted_intervals = sorted(intervals, key=lambda x: x[0])
+        
+        merged = [sorted_intervals[0]]
+        
+        for current in sorted_intervals[1:]:
+            last = merged[-1]
+            # Check if current interval overlaps with the last merged interval
+            if current[0] <= last[1]:
+                # Merge: update the end of the last interval if current extends further
+                merged[-1] = (last[0], max(last[1], current[1]))
+            else:
+                # No overlap, add current interval as a new merged interval
+                merged.append(current)
+        
+        return merged
+    
+    
+    # Tests
+    if __
+
+📊 [docs_qa] 22263 prompt tokens
+  sdpa      prefill    2442 ms (attention  162.7 ms)  decode  14.0 tok/s (attention 1.96 ms/token)  peak +3706 MiB prefill / +5130 MiB generate  256 tokens  (NOT repeatable run to run)
+  fa2       prefill    2608 ms (attention  380.1 ms)  decode  14.0 tok/s (attention 2.16 ms/token)  peak +3706 MiB prefill / +5130 MiB generate  256 tokens
+  cudnn     prefill    2451 ms (attention  161.8 ms)  decode  14.3 tok/s (attention 2.42 ms/token)  peak +3706 MiB prefill / +5130 MiB generate  256 tokens  (NOT repeatable run to run)
+  flashtile prefill    2538 ms (attention  281.8 ms)  decode  14.1 tok/s (attention 9.37 ms/token)  peak +3706 MiB prefill / +5130 MiB generate  256 tokens  FlashTile calls={'causal': 16, 'decode': 4080}
+  fa2       vs SDPA, last 64 positions: max |dlogit| 2.125  mean 0.0384  top-1 agree 100.0%  KL 7.04e-04
+  cudnn     vs SDPA, last 64 positions: max |dlogit| 0.000  mean 0.0000  top-1 agree 100.0%  KL 0.00e+00
+  flashtile vs SDPA, last 64 positions: max |dlogit| 1.453  mean 0.0382  top-1 agree 100.0%  KL 7.54e-04
+  greedy sdpa vs fa2: IDENTICAL (256 vs 256 tokens)
+  greedy sdpa vs cudnn: diverge at token 80 (256 vs 256 tokens)
+  greedy sdpa vs flashtile: diverge at token 30 (256 vs 256 tokens)
+  greedy fa2 vs cudnn: diverge at token 80 (256 vs 256 tokens)
+  greedy fa2 vs flashtile: diverge at token 30 (256 vs 256 tokens)
+  greedy cudnn vs flashtile: diverge at token 30 (256 vs 256 tokens)
+  FlashTile answer: FlashTile is slower than PyTorch’s cuDNN backend on datacenter GPUs (H200 and B200) for most workloads, particularly at long contexts and head dimension 256. On B200, cuDNN is 1.6–3.5x faster. On H200, FlashTile reaches only 55–88% of cuDNN’s speed. On the RTX PRO 6000, FlashTile is slower than PyTorch’s FA2 backend for backward passes (0.60–0.85x) and for head dimension 256 workloads.
+    
+    The README lists these weak spots:
+    1.  **cuDNN superiority:** cuDNN is significantly faster on datacenter GPUs.
+    2.  **Head dim 256:** This is the weakest case, making Qwen3.5-4B attention 1.38–3.65x slower than competitors.
+    3.  **Backward pass:** It lags the forward pass, being 0.55–0.85x the speed of FA2/cuDNN.
+    4.  **Decoding:** Long
+
+📊 [code_qa] 33846 prompt tokens
+  sdpa      prefill    3822 ms (attention  370.3 ms)  decode  14.0 tok/s (attention 5.00 ms/token)  peak +5620 MiB prefill / +7725 MiB generate  207 tokens  (NOT repeatable run to run)
+  fa2       prefill    4220 ms (attention  819.1 ms)  decode  13.9 tok/s (attention 2.25 ms/token)  peak +5620 MiB prefill / +7725 MiB generate  221 tokens
+  cudnn     prefill    3841 ms (attention  370.8 ms)  decode  14.1 tok/s (attention 2.44 ms/token)  peak +5620 MiB prefill / +7725 MiB generate  186 tokens  (NOT repeatable run to run)
+  flashtile prefill    4048 ms (attention  627.1 ms)  decode  14.2 tok/s (attention 12.62 ms/token)  peak +5620 MiB prefill / +7725 MiB generate  217 tokens  FlashTile calls={'causal': 16, 'decode': 3456}
+  fa2       vs SDPA, last 64 positions: max |dlogit| 12.906  mean 0.0748  top-1 agree 96.9%  KL 1.03e-03
+  cudnn     vs SDPA, last 64 positions: max |dlogit| 0.000  mean 0.0000  top-1 agree 100.0%  KL 0.00e+00
+  flashtile vs SDPA, last 64 positions: max |dlogit| 10.422  mean 0.0648  top-1 agree 98.4%  KL 5.65e-04
+  greedy sdpa vs fa2: diverge at token 35 (207 vs 221 tokens)
+  greedy sdpa vs cudnn: diverge at token 35 (207 vs 186 tokens)
+  greedy sdpa vs flashtile: diverge at token 35 (207 vs 217 tokens)
+  greedy fa2 vs cudnn: diverge at token 109 (221 vs 186 tokens)
+  greedy fa2 vs flashtile: diverge at token 149 (221 vs 217 tokens)
+  greedy cudnn vs flashtile: diverge at token 109 (186 vs 217 tokens)
+  FlashTile answer: In `hf.py`, if `attention_mask` is `None`, it checks `is_causal`. If causal and `lq == 1`, it treats it as decode (non-causal). If causal and `lq > 1`, it passes `q_pos`/`k_pos` to `attention()`, which routes to the Triton path if positions are contiguous. If `attention_mask` is provided, it converts additive masks to boolean and calls `attention()` with `allow_mask`, forcing the tiled path.
+    
+    The Triton forward kernel splits the key loop into two phases: "full" tiles (no masking) and "masked" tiles (diagonal/ragged). On masked tiles, it applies causal logic (`offs_n <= offs_m + DIAG`) and boundary checks (`offs_n < LK`) to set invalid scores to `-inf`. It then updates the running max (`m_i`) and sum (`l_i`) using these masked scores, ensuring numerical stability by shifting exponents based on the new max, before accumulating the output.
+
+==============================================================================
+Summary
+==============================================================================
+prompt    tokens |         sdpa          |          fa2          |         cudnn         |       flashtile      
+                 | prefill/attn ms, tok/s | prefill/attn ms, tok/s | prefill/attn ms, tok/s | prefill/attn ms, tok/s
+short         30 |     114/  2.6  11.7   |     135/  2.6  11.8   |     135/  3.1  12.0   |     115/  4.1  11.4  
+math          62 |     139/  2.7  11.8   |     118/  2.5  11.6   |     128/  3.4  11.8   |     118/  4.1  11.5  
+code          39 |     122/  2.5  11.5   |     133/  3.7  14.0   |      99/  2.6  13.9   |     106/  3.7  13.8  
+docs_qa    22263 |    2442/162.7  14.0   |    2608/380.1  14.0   |    2451/161.8  14.3   |    2538/281.8  14.1  
+code_qa    33846 |    3822/370.3  14.0   |    4220/819.1  13.9   |    3841/370.8  14.1   |    4048/627.1  14.2  
+
+  [short] prefill attention time / FlashTile's: sdpa 0.63x, fa2 0.64x, cudnn 0.76x
+  [math] prefill attention time / FlashTile's: sdpa 0.67x, fa2 0.61x, cudnn 0.83x
+  [code] prefill attention time / FlashTile's: sdpa 0.67x, fa2 0.99x, cudnn 0.71x
+  [docs_qa] prefill attention time / FlashTile's: sdpa 0.58x, fa2 1.35x, cudnn 0.57x
+  [code_qa] prefill attention time / FlashTile's: sdpa 0.59x, fa2 1.31x, cudnn 0.59x
+  [short] greedy tokens matching SDPA: fa2 67/109, cudnn 100/100, flashtile 67/109
+  [math] greedy tokens matching SDPA: fa2 256/256, cudnn 256/256, flashtile 256/256
+  [code] greedy tokens matching SDPA: fa2 79/256, cudnn 256/256, flashtile 79/256
+  [docs_qa] greedy tokens matching SDPA: fa2 256/256, cudnn 80/256, flashtile 30/256
+  [code_qa] greedy tokens matching SDPA: fa2 35/221, cudnn 35/186, flashtile 35/217
+
+Figure: compare_dashboard.png

@@ -1,0 +1,188 @@
+{
+  "device": "cuda",
+  "gpu_name": "NVIDIA B200",
+  "gpu_memory_gb": 191.5,
+  "installation": {
+    "package": "flashtile (src/)",
+    "torch_version": "2.15.0+cu132",
+    "cuda_available": true,
+    "cuda_version": "13.2",
+    "triton_available": true,
+    "triton_version": "3.9.0",
+    "python": "3.12.10"
+  },
+  "backend_selection": {
+    "bf16 causal prefill": {
+      "backend": "triton",
+      "reason": "supported"
+    },
+    "bf16 decode, CPU positions": {
+      "backend": "triton",
+      "reason": "supported"
+    },
+    "bf16 Boolean mask": {
+      "backend": "tiled",
+      "reason": "arbitrary Boolean masks are only handled by the tiled path"
+    },
+    "bf16 causal, positions with gaps": {
+      "backend": "tiled",
+      "reason": "causal positions are not contiguous ranges"
+    },
+    "fp64 inputs": {
+      "backend": "tiled",
+      "reason": "dtype torch.float64 is not handled by the triton kernels"
+    },
+    "CPU tensors": {
+      "backend": "tiled",
+      "reason": "tensors are on cpu, triton needs CUDA"
+    }
+  },
+  "forward_pass": {
+    "FlashTile triton": {
+      "status": "OK",
+      "shape": [
+        2,
+        8,
+        512,
+        64
+      ],
+      "finite": true
+    },
+    "FlashTile tiled": {
+      "status": "OK",
+      "shape": [
+        2,
+        8,
+        512,
+        64
+      ],
+      "finite": true
+    },
+    "Reference (fp64 oracle)": {
+      "status": "OK",
+      "shape": [
+        2,
+        8,
+        512,
+        64
+      ],
+      "finite": true
+    },
+    "PyTorch SDPA": {
+      "status": "OK",
+      "shape": [
+        2,
+        8,
+        512,
+        64
+      ],
+      "finite": true
+    }
+  },
+  "correctness": {
+    "FlashTile triton": {
+      "max_diff": 0.007761077978474251,
+      "mean_diff": 0.00020648701095609952,
+      "verdict": "PASS"
+    },
+    "FlashTile tiled": {
+      "max_diff": 0.007761077978474251,
+      "mean_diff": 0.00014383513860426796,
+      "verdict": "PASS"
+    },
+    "PyTorch SDPA": {
+      "max_diff": 0.007761077978474251,
+      "mean_diff": 0.0002118764958853277,
+      "verdict": "PASS"
+    }
+  },
+  "backward": {
+    "FlashTile triton": {
+      "max_rel_err": {
+        "dq": 0.003714836136808418,
+        "dk": 0.004328084090801066,
+        "dv": 0.0038832386208457782
+      },
+      "grad_shape": [
+        [
+          2,
+          8,
+          512,
+          64
+        ],
+        [
+          2,
+          2,
+          512,
+          64
+        ],
+        [
+          2,
+          2,
+          512,
+          64
+        ]
+      ],
+      "verdict": "PASS"
+    },
+    "FlashTile tiled": {
+      "max_rel_err": {
+        "dq": 0.0028178064818784095,
+        "dk": 0.0028085996116744864,
+        "dv": 0.003001821585092138
+      },
+      "grad_shape": [
+        [
+          2,
+          8,
+          512,
+          64
+        ],
+        [
+          2,
+          2,
+          512,
+          64
+        ],
+        [
+          2,
+          2,
+          512,
+          64
+        ]
+      ],
+      "verdict": "PASS"
+    }
+  },
+  "memory_mb": {
+    "4096": {
+      "one_LxL_bf16_table_mb": 256.0,
+      "Naive (PyTorch math)": 2088.0,
+      "FlashTile triton": 28.25048828125,
+      "FlashTile tiled": 85.5
+    },
+    "8192": {
+      "one_LxL_bf16_table_mb": 1024.0,
+      "Naive (PyTorch math)": 8272.0,
+      "FlashTile triton": 56.50048828125,
+      "FlashTile tiled": 125.9375
+    }
+  },
+  "autotune": {
+    "fwd": {
+      "(512, 512, 4, 64, 64, True, 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32')": "BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None",
+      "(4096, 4096, 1, 64, 64, True, 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32')": "BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None",
+      "(8192, 8192, 1, 64, 64, True, 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32')": "BLOCK_M: 128, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 3, maxnreg: None, ir_override: None"
+    },
+    "bwd_dkdv": {
+      "(512, 512, 4, 64, 64, True, False, 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32', 'torch.float32', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32')": "BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None",
+      "(4096, 4096, 1, 64, 64, True, False, 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32', 'torch.float32', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32')": "BLOCK_M: 64, BLOCK_N: 128, num_warps: 8, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None",
+      "(8192, 8192, 1, 64, 64, True, False, 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32', 'torch.float32', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32')": "BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None"
+    },
+    "bwd_dq": {
+      "(512, 512, 4, 64, 64, True, 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32', 'torch.float32', 'torch.bfloat16')": "BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None",
+      "(4096, 4096, 1, 64, 64, True, 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32', 'torch.float32', 'torch.bfloat16')": "BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None",
+      "(8192, 8192, 1, 64, 64, True, 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'torch.float32', 'torch.float32', 'torch.bfloat16')": "BLOCK_M: 64, BLOCK_N: 64, num_warps: 4, num_ctas: 1, num_stages: 2, maxnreg: None, ir_override: None"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+platform linux -- Python 3.12.10, torch 2.15.0+cu132, triton 3.9.0, GPU NVIDIA B200
+collected 5 items
+
+tests/test_cuda.py::test_low_precision_against_fp64_oracle[dtype0-2e-05] PASSED[ 20%]
+tests/test_cuda.py::test_low_precision_against_fp64_oracle[dtype1-0.02] PASSED[ 40%]
+tests/test_cuda.py::test_low_precision_against_fp64_oracle[dtype2-0.004] PASSED[ 60%]
+tests/test_cuda.py::test_training_step_memory_is_not_quadratic PASSED         [ 80%]
+tests/test_cuda.py::test_device_and_dtype_reported PASSED                     [100%]
+
+============================= 5 passed in 1.46s ==============================

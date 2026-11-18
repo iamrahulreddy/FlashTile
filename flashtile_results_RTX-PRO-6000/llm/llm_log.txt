@@ -1,0 +1,139 @@
+==============================================================================
+FlashTile in a real LLM: Qwen3.5-4B
+==============================================================================
+GPU: NVIDIA RTX PRO 6000 Blackwell Server Edition  sm_120  95 GiB
+torch 2.15.0+cu132  transformers 5.23.0
+8-bit model: RedHatAI/Qwen3.5-4B-FP8-dynamic (FP8 E4M3 weights per channel, FP8 activations per token, compressed-tensors)
+bf16 model:  Qwen/Qwen3.5-4B (training section)
+Text: FlashTile docs (TECHNICAL-REFERENCE.md, BLUEPRINT.md, INTERVIEW-PRACTICE.md, STUDY-GUIDE.md), 99574 tokens
+Loaded in 5s, 6227 MB on GPU. 32 layers; softmax attention in layers [3, 7, 11, 15, 19, 23, 27, 31] (Hq=16, Hkv=4, d=256); the rest are Gated DeltaNet.
+==============================================================================
+
+📊 Precision on real activations (FP8 model, forward, L=4096)...
+  layer  3: FlashTile out max|err|=1.56e-02 (lse 1.0e-05)  SDPA out max|err|=1.57e-02  | max|s|=22.2  mean max-prob=0.138
+  layer  7: FlashTile out max|err|=3.25e-02 (lse 8.1e-06)  SDPA out max|err|=3.11e-02  | max|s|=21.8  mean max-prob=0.221
+  layer 11: FlashTile out max|err|=3.51e-02 (lse 8.2e-06)  SDPA out max|err|=3.51e-02  | max|s|=22.8  mean max-prob=0.200
+  layer 15: FlashTile out max|err|=6.20e-02 (lse 9.0e-06)  SDPA out max|err|=6.20e-02  | max|s|=24.5  mean max-prob=0.181
+  layer 19: FlashTile out max|err|=1.16e-01 (lse 9.9e-06)  SDPA out max|err|=1.16e-01  | max|s|=24.5  mean max-prob=0.206
+  layer 23: FlashTile out max|err|=7.44e-02 (lse 7.5e-06)  SDPA out max|err|=7.44e-02  | max|s|=21.6  mean max-prob=0.158
+  layer 27: FlashTile out max|err|=7.77e-02 (lse 9.0e-06)  SDPA out max|err|=7.87e-02  | max|s|=22.5  mean max-prob=0.167
+  layer 31: FlashTile out max|err|=9.89e-02 (lse 1.4e-05)  SDPA out max|err|=9.89e-02  | max|s|=23.0  mean max-prob=0.323
+
+📊 Long-context prefill (FP8 model, batch 1)...
+  seq_len=  2048 sdpa      OK (time=91.0ms, attention=1.7ms [2%], mem=354MB, 22507 tok/s)
+  seq_len=  2048 flashtile OK (time=95.2ms, attention=3.1ms [3%], mem=354MB, 21523 tok/s, vs SDPA: max|Δlogit|=2.398, top-1 agree=94.1%)
+  seq_len=  2048 eager     OK (time=103.6ms, attention=13.4ms [13%], mem=872MB, 19774 tok/s, vs SDPA: max|Δlogit|=3.180, top-1 agree=94.9%)
+  seq_len=  4096 sdpa      OK (time=174.4ms, attention=4.2ms [2%], mem=585MB, 23490 tok/s)
+  seq_len=  4096 flashtile OK (time=176.2ms, attention=5.9ms [3%], mem=585MB, 23246 tok/s, vs SDPA: max|Δlogit|=3.938, top-1 agree=93.0%)
+  seq_len=  4096 eager     OK (time=220.9ms, attention=50.2ms [23%], mem=2918MB, 18544 tok/s, vs SDPA: max|Δlogit|=3.891, top-1 agree=95.7%)
+  seq_len=  8192 sdpa      OK (time=393.9ms, attention=14.5ms [4%], mem=1048MB, 20795 tok/s)
+  seq_len=  8192 flashtile OK (time=401.2ms, attention=22.1ms [6%], mem=1048MB, 20421 tok/s, vs SDPA: max|Δlogit|=1.500, top-1 agree=93.4%)
+  seq_len=  8192 eager     OK (time=583.9ms, attention=205.0ms [35%], mem=10899MB, 14029 tok/s, vs SDPA: max|Δlogit|=2.188, top-1 agree=96.9%)
+  seq_len= 16384 sdpa      OK (time=840.7ms, attention=53.3ms [6%], mem=1976MB, 19488 tok/s)
+  seq_len= 16384 flashtile OK (time=873.6ms, attention=85.8ms [10%], mem=1976MB, 18755 tok/s, vs SDPA: max|Δlogit|=9.318, top-1 agree=97.3%)
+  seq_len= 16384 eager     OK (time=1601.5ms, attention=811.8ms [51%], mem=42414MB, 10231 tok/s, vs SDPA: max|Δlogit|=5.125, top-1 agree=98.4%)
+  seq_len= 32768 sdpa      OK (time=1846.7ms, attention=202.9ms [11%], mem=3830MB, 17744 tok/s)
+  seq_len= 32768 flashtile OK (time=1988.4ms, attention=343.5ms [17%], mem=3830MB, 16480 tok/s, vs SDPA: max|Δlogit|=11.219, top-1 agree=98.4%)
+  seq_len= 32768 eager     OOM (CUDA out of memory. Tried to allocate 64.00 GiB. GPU 0 has a total capacity of 95.01 GiB of which 47)
+  seq_len= 65536 sdpa      OK (time=4094.7ms, attention=800.4ms [20%], mem=7534MB, 16005 tok/s)
+  seq_len= 65536 flashtile OK (time=4732.9ms, attention=1451.5ms [31%], mem=7534MB, 13847 tok/s, vs SDPA: max|Δlogit|=3.516, top-1 agree=95.3%)
+  seq_len= 65536 eager     OOM (CUDA out of memory. Tried to allocate 128.00 GiB. GPU 0 has a total capacity of 95.01 GiB of which 7)
+
+📊 Greedy generation (FP8 model, chat template, thinking off, 200 new tokens)...
+  [short] prompt tokens: 35
+    sdpa      prefill=58ms  decode=19.7 tok/s  new tokens=121
+    flashtile prefill=59ms  decode=16.4 tok/s  new tokens=113  FlashTile calls={'causal': 24, 'decode': 896}
+    greedy outputs diverge at token 19 (121 vs 113 tokens)
+    FlashTile answer: Attention requires a softmax function to convert raw attention scores into a valid probability distribution, ensuring that the sum of weights across all positions equals one while allowing the model to focus on the most relevant information. The scaling factor of $1/\sqrt{d}$ is applied to the dot product inputs to prevent them from growing too large, which would cause the softmax function to become numerically unstable and output values that are too close to zero or one. This scaling keeps the gradients during backpropagation in a reasonable range, thereby maintaining stable and efficient training dynamics.
+  [code] prompt tokens: 32
+    sdpa      prefill=59ms  decode=20.5 tok/s  new tokens=160
+    flashtile prefill=59ms  decode=20.3 tok/s  new tokens=142  FlashTile calls={'causal': 24, 'decode': 1128}
+    greedy outputs diverge at token 5 (160 vs 142 tokens)
+    FlashTile answer: ```python
+      import math
+      
+      def log_sum_exp(values):
+          """
+          Compute log(sum(exp(x))) in a numerically stable way.
+          
+          Args:
+              values (list[float]): List of floating-point numbers.
+          
+          Returns:
+              float: log(sum(exp(x))).
+          """
+          if not values:
+              return float('-inf')
+          
+          # Find the maximum value to prevent underflow/overflow
+          m = max(values)
+          
+          # Compute sum of exp(x - m)
+          s = sum(math.exp(x - m) for x in values)
+          
+          return m + math.log(s)
+      ```
+  [long_document_qa] prompt tokens: 39459
+    sdpa      prefill=2254ms  decode=19.7 tok/s  new tokens=68
+    flashtile prefill=2412ms  decode=11.7 tok/s  new tokens=71  FlashTile calls={'causal': 24, 'decode': 560}
+    greedy outputs diverge at token 39 (68 vs 71 tokens)
+    FlashTile answer: For a query row where all keys are masked, FlashTile returns an output of zero, a gradient of zero, and an LSE of negative infinity. This behavior is defined by the fully masked branch, which explicitly sets the probability weights to zero and prevents the evaluation of undefined operations like $-\infty - (-\infty)$.
+
+📊 Precision with real gradients (bf16 model, training loss, L=4096)...
+  layer  3: FlashTile out max|err|=1.83e-02 (lse 9.4e-06)  SDPA out max|err|=1.68e-02  | max|s|=22.2  mean max-prob=0.137
+            grads rel err  FlashTile dq/dk/dv=7.5e-03/3.1e-03/3.1e-03   SDPA dq/dk/dv=7.5e-03/3.9e-03/3.1e-03
+  layer  7: FlashTile out max|err|=3.06e-02 (lse 9.8e-06)  SDPA out max|err|=3.06e-02  | max|s|=22.0  mean max-prob=0.222
+            grads rel err  FlashTile dq/dk/dv=2.5e-03/1.6e-03/2.0e-03   SDPA dq/dk/dv=2.5e-03/2.2e-03/2.6e-03
+  layer 11: FlashTile out max|err|=5.45e-02 (lse 8.4e-06)  SDPA out max|err|=5.45e-02  | max|s|=22.8  mean max-prob=0.198
+            grads rel err  FlashTile dq/dk/dv=5.1e-03/2.6e-03/2.0e-03   SDPA dq/dk/dv=3.9e-03/3.1e-03/4.0e-03
+  layer 15: FlashTile out max|err|=6.07e-02 (lse 1.1e-05)  SDPA out max|err|=6.07e-02  | max|s|=24.6  mean max-prob=0.181
+            grads rel err  FlashTile dq/dk/dv=4.5e-03/2.3e-03/2.0e-03   SDPA dq/dk/dv=5.0e-03/4.4e-03/3.9e-03
+  layer 19: FlashTile out max|err|=1.24e-01 (lse 1.0e-05)  SDPA out max|err|=1.24e-01  | max|s|=24.4  mean max-prob=0.205
+            grads rel err  FlashTile dq/dk/dv=5.0e-03/4.0e-03/3.2e-03   SDPA dq/dk/dv=6.9e-03/4.4e-03/4.7e-03
+  layer 23: FlashTile out max|err|=6.36e-02 (lse 7.9e-06)  SDPA out max|err|=6.14e-02  | max|s|=21.6  mean max-prob=0.156
+            grads rel err  FlashTile dq/dk/dv=3.6e-03/2.7e-03/3.2e-03   SDPA dq/dk/dv=3.6e-03/6.8e-03/4.3e-03
+  layer 27: FlashTile out max|err|=8.41e-02 (lse 1.0e-05)  SDPA out max|err|=7.97e-02  | max|s|=22.7  mean max-prob=0.166
+            grads rel err  FlashTile dq/dk/dv=3.0e-03/2.9e-03/2.4e-03   SDPA dq/dk/dv=3.8e-03/4.3e-03/4.1e-03
+  layer 31: FlashTile out max|err|=1.01e-01 (lse 1.2e-05)  SDPA out max|err|=1.01e-01  | max|s|=23.1  mean max-prob=0.322
+            grads rel err  FlashTile dq/dk/dv=4.2e-03/3.3e-03/5.0e-03   SDPA dq/dk/dv=4.2e-03/3.3e-03/5.0e-03
+
+📊 Fine-tuning, SDPA vs FlashTile from the same weights (L=4096, 30 steps)...
+  trainable: the 8 softmax-attention blocks, 293.6M parameters (fp32 master copies, AdamW lr=2e-05); every other layer frozen but back-propagated through
+  sdpa      loss 2.3660 -> 2.2381   median step 437 ms
+  flashtile loss 2.3667 -> 2.2371   median step 443 ms
+  |loss(SDPA) - loss(FlashTile)|: step 0 7.18e-04, max over 30 steps 2.71e-03
+
+📊 Training step (fwd+bwd) vs sequence length (bf16 model, batch 1)...
+  seq_len=  2048 sdpa      OK (fwd+bwd=195ms, mem=16110MB, 10494 tok/s)
+  seq_len=  2048 flashtile OK (fwd+bwd=198ms, mem=16110MB, 10367 tok/s)
+  seq_len=  2048 eager     OK (fwd+bwd=222ms, mem=19245MB, 9234 tok/s)
+  seq_len=  4096 sdpa      OK (fwd+bwd=421ms, mem=26419MB, 9739 tok/s)
+  seq_len=  4096 flashtile OK (fwd+bwd=426ms, mem=26419MB, 9607 tok/s)
+  seq_len=  4096 eager     OK (fwd+bwd=525ms, mem=38833MB, 7797 tok/s)
+  seq_len=  8192 sdpa      OK (fwd+bwd=935ms, mem=47017MB, 8762 tok/s)
+  seq_len=  8192 flashtile OK (fwd+bwd=959ms, mem=47017MB, 8538 tok/s)
+  seq_len=  8192 eager     OOM (CUDA out of memory. Tried to allocate 2.00 GiB. GPU 0 has a total capacity of 95.01 GiB of which 519)
+  seq_len= 16384 sdpa      OOM (CUDA out of memory. Tried to allocate 1.89 GiB. GPU 0 has a total capacity of 95.01 GiB of which 1.1)
+  seq_len= 16384 flashtile OOM (CUDA out of memory. Tried to allocate 1.89 GiB. GPU 0 has a total capacity of 95.01 GiB of which 1.1)
+  seq_len= 16384 eager     OOM (CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 95.01 GiB of which 601)
+
+==============================================================================
+Summary
+==============================================================================
+  FP8 forward precision, worst layer: FlashTile out err 1.16e-01 vs SDPA 1.16e-01
+  bf16 fwd+bwd precision, worst layer: FlashTile out err 1.24e-01 vs SDPA 1.24e-01
+    dq: FlashTile 7.52e-03 vs SDPA 7.52e-03
+    dk: FlashTile 3.97e-03 vs SDPA 6.83e-03
+    dv: FlashTile 5.00e-03 vs SDPA 5.00e-03
+  prefill L=  2048: FlashTile 95 ms vs SDPA 91 ms (attention 3 vs 2 ms), top-1 agree 94.1%
+  prefill L=  4096: FlashTile 176 ms vs SDPA 174 ms (attention 6 vs 4 ms), top-1 agree 93.0%
+  prefill L=  8192: FlashTile 401 ms vs SDPA 394 ms (attention 22 vs 15 ms), top-1 agree 93.4%
+  prefill L= 16384: FlashTile 874 ms vs SDPA 841 ms (attention 86 vs 53 ms), top-1 agree 97.3%
+  prefill L= 32768: FlashTile 1988 ms vs SDPA 1847 ms (attention 344 vs 203 ms), top-1 agree 98.4%
+  prefill L= 65536: FlashTile 4733 ms vs SDPA 4095 ms (attention 1451 vs 800 ms), top-1 agree 95.3%
+  generation [short]: diverged at token 19
+  generation [code]: diverged at token 5
+  generation [long_document_qa]: diverged at token 39
+  training: max |loss(SDPA) - loss(FlashTile)| over 30 steps = 2.71e-03
+
+Figures: llm_dashboard.png, llm_training.png, llm_precision.png

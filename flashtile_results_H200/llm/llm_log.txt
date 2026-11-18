@@ -1,0 +1,142 @@
+==============================================================================
+FlashTile in a real LLM: Qwen3.5-4B
+==============================================================================
+GPU: NVIDIA H200  sm_90  140 GiB
+torch 2.15.0+cu132  transformers 5.23.0
+8-bit model: RedHatAI/Qwen3.5-4B-FP8-dynamic (FP8 E4M3 weights per channel, FP8 activations per token, compressed-tensors)
+bf16 model:  Qwen/Qwen3.5-4B (training section)
+Text: FlashTile docs (TECHNICAL-REFERENCE.md, BLUEPRINT.md, INTERVIEW-PRACTICE.md, STUDY-GUIDE.md), 99574 tokens
+Note (measured with torch.profiler on H200): transformers runs this compressed-tensors FP8 checkpoint by quantize-dequantize in PyTorch and the same bf16 GEMM kernels as the bf16 model, so 8-bit saves weight memory, not time; at batch 1 below ~8k tokens the whole model is limited by CPU kernel launches, so attention time is reported separately (CUDA events around each attention call).
+Loaded in 5s, 6227 MB on GPU. 32 layers; softmax attention in layers [3, 7, 11, 15, 19, 23, 27, 31] (Hq=16, Hkv=4, d=256); the rest are Gated DeltaNet.
+==============================================================================
+
+📊 Precision on real activations (FP8 model, forward, L=4096)...
+  layer  3: FlashTile out max|err|=1.73e-02 (rel 2.6e-03, lse 1.0e-05)  SDPA out max|err|=1.73e-02 (rel 2.6e-03)  | max|s|=22.1  mean max-prob=0.138
+  layer  7: FlashTile out max|err|=3.11e-02 (rel 1.8e-03, lse 8.3e-06)  SDPA out max|err|=3.17e-02 (rel 1.8e-03)  | max|s|=21.7  mean max-prob=0.221
+  layer 11: FlashTile out max|err|=6.23e-02 (rel 2.5e-03, lse 8.8e-06)  SDPA out max|err|=6.23e-02 (rel 2.5e-03)  | max|s|=22.9  mean max-prob=0.200
+  layer 15: FlashTile out max|err|=6.20e-02 (rel 2.5e-03, lse 1.1e-05)  SDPA out max|err|=6.20e-02 (rel 2.5e-03)  | max|s|=24.3  mean max-prob=0.181
+  layer 19: FlashTile out max|err|=1.23e-01 (rel 2.5e-03, lse 8.6e-06)  SDPA out max|err|=1.23e-01 (rel 2.5e-03)  | max|s|=25.0  mean max-prob=0.206
+  layer 23: FlashTile out max|err|=6.58e-02 (rel 2.2e-03, lse 7.6e-06)  SDPA out max|err|=6.58e-02 (rel 2.2e-03)  | max|s|=21.6  mean max-prob=0.157
+  layer 27: FlashTile out max|err|=8.75e-02 (rel 3.0e-03, lse 8.6e-06)  SDPA out max|err|=8.75e-02 (rel 3.0e-03)  | max|s|=22.6  mean max-prob=0.167
+  layer 31: FlashTile out max|err|=1.49e-01 (rel 4.0e-03, lse 1.4e-05)  SDPA out max|err|=1.49e-01 (rel 4.0e-03)  | max|s|=22.9  mean max-prob=0.323
+
+📊 Long-context prefill (FP8 model, batch 1)...
+  seq_len=  2048 sdpa      OK (time=114.2ms, attention=1.5ms [1%], mem=354MB, 17927 tok/s)
+  seq_len=  2048 flashtile OK (time=101.7ms, attention=2.2ms [2%], mem=354MB, 20143 tok/s, vs SDPA: max|Δlogit|=4.812, top-1 agree=95.3%)
+  seq_len=  2048 eager     OK (time=107.3ms, attention=6.8ms [6%], mem=872MB, 19086 tok/s, vs SDPA: max|Δlogit|=4.469, top-1 agree=95.3%)
+  seq_len=  4096 sdpa      OK (time=150.1ms, attention=2.4ms [2%], mem=585MB, 27285 tok/s)
+  seq_len=  4096 flashtile OK (time=164.7ms, attention=3.9ms [2%], mem=585MB, 24867 tok/s, vs SDPA: max|Δlogit|=2.957, top-1 agree=96.1%)
+  seq_len=  4096 eager     OK (time=173.8ms, attention=25.8ms [15%], mem=2918MB, 23574 tok/s, vs SDPA: max|Δlogit|=2.789, top-1 agree=97.3%)
+  seq_len=  8192 sdpa      OK (time=278.0ms, attention=7.5ms [3%], mem=1049MB, 29465 tok/s)
+  seq_len=  8192 flashtile OK (time=280.3ms, attention=9.7ms [3%], mem=1049MB, 29230 tok/s, vs SDPA: max|Δlogit|=1.621, top-1 agree=96.1%)
+  seq_len=  8192 eager     OK (time=380.4ms, attention=109.6ms [29%], mem=10900MB, 21535 tok/s, vs SDPA: max|Δlogit|=1.625, top-1 agree=94.9%)
+  seq_len= 16384 sdpa      OK (time=543.2ms, attention=26.1ms [5%], mem=1976MB, 30162 tok/s)
+  seq_len= 16384 flashtile OK (time=552.9ms, attention=35.6ms [6%], mem=1976MB, 29632 tok/s, vs SDPA: max|Δlogit|=9.000, top-1 agree=97.3%)
+  seq_len= 16384 eager     OK (time=883.2ms, attention=363.1ms [41%], mem=42414MB, 18550 tok/s, vs SDPA: max|Δlogit|=5.438, top-1 agree=97.3%)
+  seq_len= 32768 sdpa      OK (time=1112.6ms, attention=97.7ms [9%], mem=3830MB, 29451 tok/s)
+  seq_len= 32768 flashtile OK (time=1153.7ms, attention=138.1ms [12%], mem=3830MB, 28402 tok/s, vs SDPA: max|Δlogit|=13.855, top-1 agree=97.7%)
+  seq_len= 32768 eager     OOM (CUDA out of memory. Tried to allocate 64.00 GiB. GPU 0 has a total capacity of 139.79 GiB of which 2)
+  seq_len= 65536 sdpa      OK (time=2453.1ms, attention=411.5ms [17%], mem=7534MB, 26716 tok/s)
+  seq_len= 65536 flashtile OK (time=2598.5ms, attention=569.3ms [22%], mem=7534MB, 25221 tok/s, vs SDPA: max|Δlogit|=4.516, top-1 agree=97.3%)
+  seq_len= 65536 eager     OOM (CUDA out of memory. Tried to allocate 128.00 GiB. GPU 0 has a total capacity of 139.79 GiB of which )
+
+📊 Greedy generation (FP8 model, chat template, thinking off, 200 new tokens)...
+  [short] prompt tokens: 35
+    sdpa      prefill=116ms  decode=11.5 tok/s  new tokens=122
+    flashtile prefill=110ms  decode=11.5 tok/s  new tokens=118  FlashTile calls={'causal': 8, 'decode': 936}
+    greedy outputs diverge at token 27 (122 vs 118 tokens)
+    FlashTile answer: Attention requires a softmax function to convert raw attention scores into a valid probability distribution, ensuring that the sum of weights across all positions equals one and that no single token dominates the context representation. The scaling factor $1/\sqrt{d}$ is applied to the dot product before the softmax to prevent the values from growing too large, which would cause the softmax function to become numerically unstable and output values close to zero or one. This scaling maintains the gradient flow during backpropagation, allowing the model to learn effective attention weights even as the dimensionality of the input vectors increases.
+  [code] prompt tokens: 32
+    sdpa      prefill=109ms  decode=11.0 tok/s  new tokens=141
+    flashtile prefill=106ms  decode=12.0 tok/s  new tokens=141  FlashTile calls={'causal': 8, 'decode': 1120}
+    greedy outputs IDENTICAL (141 vs 141 tokens)
+    FlashTile answer: ```python
+      import math
+      
+      def log_sum_exp(values):
+          """
+          Compute log(sum(exp(x))) in a numerically stable way.
+          
+          Args:
+              values (list[float]): List of floating-point numbers.
+              
+          Returns:
+              float: log(sum(exp(x))).
+          """
+          if not values:
+              return float('-inf')
+          
+          # Find the maximum value to shift the exponentials
+          m = max(values)
+          
+          # Compute sum of exp(x - m)
+          s = sum(math.exp(x - m) for x in values)
+          
+          return m + math.log(s)
+      ```
+  [long_document_qa] prompt tokens: 39459
+    sdpa      prefill=1367ms  decode=11.8 tok/s  new tokens=74
+    flashtile prefill=1459ms  decode=11.6 tok/s  new tokens=78  FlashTile calls={'causal': 8, 'decode': 616}
+    greedy outputs diverge at token 50 (74 vs 78 tokens)
+    FlashTile answer: For a query row where all keys are masked, FlashTile returns an output of zero, a gradient of zero, and an LSE of negative infinity. This behavior is defined by the "fully masked rows" contract, which explicitly sets the probability weights and weighted value sum to zero while assigning the log-sum-exp statistic the $-\infty$ sentinel to prevent undefined arithmetic.
+
+Loaded Qwen/Qwen3.5-4B: 9223 MB on GPU (8-bit checkpoint: 6227 MB)
+
+📊 Precision with real gradients (bf16 model, training loss, L=4096)...
+  layer  3: FlashTile out max|err|=1.72e-02 (rel 2.5e-03, lse 1.1e-05)  SDPA out max|err|=1.62e-02 (rel 2.4e-03)  | max|s|=22.2  mean max-prob=0.137
+            grads rel err  FlashTile dq/dk/dv=8.5e-03/3.2e-03/2.2e-03   SDPA dq/dk/dv=8.9e-03/3.2e-03/8.1e-03
+  layer  7: FlashTile out max|err|=3.07e-02 (rel 1.7e-03, lse 9.7e-06)  SDPA out max|err|=3.07e-02 (rel 1.7e-03)  | max|s|=21.9  mean max-prob=0.222
+            grads rel err  FlashTile dq/dk/dv=2.7e-03/1.3e-03/2.2e-03   SDPA dq/dk/dv=2.2e-03/3.1e-03/4.4e-03
+  layer 11: FlashTile out max|err|=5.42e-02 (rel 2.1e-03, lse 8.2e-06)  SDPA out max|err|=5.42e-02 (rel 2.1e-03)  | max|s|=22.8  mean max-prob=0.198
+            grads rel err  FlashTile dq/dk/dv=4.2e-03/2.1e-03/1.7e-03   SDPA dq/dk/dv=4.2e-03/4.0e-03/3.1e-03
+  layer 15: FlashTile out max|err|=6.20e-02 (rel 2.5e-03, lse 1.2e-05)  SDPA out max|err|=6.20e-02 (rel 2.5e-03)  | max|s|=24.5  mean max-prob=0.181
+            grads rel err  FlashTile dq/dk/dv=4.8e-03/5.0e-03/1.9e-03   SDPA dq/dk/dv=4.8e-03/4.1e-03/2.9e-03
+  layer 19: FlashTile out max|err|=1.24e-01 (rel 2.5e-03, lse 8.9e-06)  SDPA out max|err|=1.24e-01 (rel 2.5e-03)  | max|s|=24.2  mean max-prob=0.205
+            grads rel err  FlashTile dq/dk/dv=6.2e-03/3.0e-03/2.8e-03   SDPA dq/dk/dv=6.2e-03/4.4e-03/3.3e-03
+  layer 23: FlashTile out max|err|=6.91e-02 (rel 2.4e-03, lse 8.3e-06)  SDPA out max|err|=6.91e-02 (rel 2.4e-03)  | max|s|=21.6  mean max-prob=0.156
+            grads rel err  FlashTile dq/dk/dv=2.5e-03/3.3e-03/3.5e-03   SDPA dq/dk/dv=2.5e-03/4.0e-03/4.3e-03
+  layer 27: FlashTile out max|err|=8.79e-02 (rel 3.0e-03, lse 9.1e-06)  SDPA out max|err|=8.79e-02 (rel 3.0e-03)  | max|s|=22.8  mean max-prob=0.166
+            grads rel err  FlashTile dq/dk/dv=4.7e-03/3.0e-03/2.7e-03   SDPA dq/dk/dv=4.7e-03/4.8e-03/4.7e-03
+  layer 31: FlashTile out max|err|=1.04e-01 (rel 2.8e-03, lse 1.4e-05)  SDPA out max|err|=1.04e-01 (rel 2.8e-03)  | max|s|=23.1  mean max-prob=0.322
+            grads rel err  FlashTile dq/dk/dv=3.8e-03/2.7e-03/2.6e-03   SDPA dq/dk/dv=3.8e-03/4.6e-03/6.5e-03
+
+📊 Fine-tuning, SDPA vs FlashTile from the same weights (L=4096, 30 steps)...
+  trainable: the 8 softmax-attention blocks, 293.6M parameters (fp32 master copies, AdamW lr=2e-05); every other layer frozen but back-propagated through
+  sdpa      loss 2.3673 -> 2.2391   median step 262 ms
+  flashtile loss 2.3658 -> 2.2347   median step 274 ms
+  |loss(SDPA) - loss(FlashTile)|: step 0 1.52e-03, max over 30 steps 4.45e-03
+
+📊 Training step (fwd+bwd) vs sequence length (bf16 model, batch 1)...
+  seq_len=  2048 sdpa      OK (fwd+bwd=134ms, mem=16110MB, 15268 tok/s)
+  seq_len=  2048 flashtile OK (fwd+bwd=146ms, mem=16110MB, 14070 tok/s)
+  seq_len=  2048 eager     OK (fwd+bwd=141ms, mem=19245MB, 14490 tok/s)
+  seq_len=  4096 sdpa      OK (fwd+bwd=254ms, mem=26419MB, 16138 tok/s)
+  seq_len=  4096 flashtile OK (fwd+bwd=267ms, mem=26419MB, 15316 tok/s)
+  seq_len=  4096 eager     OK (fwd+bwd=296ms, mem=38833MB, 13858 tok/s)
+  seq_len=  8192 sdpa      OK (fwd+bwd=512ms, mem=47017MB, 15990 tok/s)
+  seq_len=  8192 flashtile OK (fwd+bwd=562ms, mem=47017MB, 14586 tok/s)
+  seq_len=  8192 eager     OK (fwd+bwd=688ms, mem=100101MB, 11915 tok/s)
+  seq_len= 16384 sdpa      OK (fwd+bwd=1095ms, mem=88212MB, 14956 tok/s)
+  seq_len= 16384 flashtile OK (fwd+bwd=1279ms, mem=88212MB, 12811 tok/s)
+  seq_len= 16384 eager     OOM (CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 139.79 GiB of which 1.)
+
+==============================================================================
+Summary
+==============================================================================
+  FP8 forward precision, worst layer: FlashTile out err 1.49e-01 vs SDPA 1.49e-01
+  bf16 fwd+bwd precision, worst layer: FlashTile out err 1.24e-01 vs SDPA 1.24e-01
+    dq: FlashTile 8.47e-03 vs SDPA 8.93e-03
+    dk: FlashTile 5.00e-03 vs SDPA 4.81e-03
+    dv: FlashTile 3.52e-03 vs SDPA 8.07e-03
+  prefill L=  2048: FlashTile 102 ms vs SDPA 114 ms (attention 2 vs 2 ms), top-1 agree 95.3%
+  prefill L=  4096: FlashTile 165 ms vs SDPA 150 ms (attention 4 vs 2 ms), top-1 agree 96.1%
+  prefill L=  8192: FlashTile 280 ms vs SDPA 278 ms (attention 10 vs 7 ms), top-1 agree 96.1%
+  prefill L= 16384: FlashTile 553 ms vs SDPA 543 ms (attention 36 vs 26 ms), top-1 agree 97.3%
+  prefill L= 32768: FlashTile 1154 ms vs SDPA 1113 ms (attention 138 vs 98 ms), top-1 agree 97.7%
+  prefill L= 65536: FlashTile 2598 ms vs SDPA 2453 ms (attention 569 vs 411 ms), top-1 agree 97.3%
+  generation [short]: diverged at token 27
+  generation [code]: identical
+  generation [long_document_qa]: diverged at token 50
+  training: max |loss(SDPA) - loss(FlashTile)| over 30 steps = 4.45e-03
+
+Figures: llm_dashboard.png, llm_training.png, llm_precision.png
